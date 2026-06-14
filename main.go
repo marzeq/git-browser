@@ -2,12 +2,8 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"net/http"
-	"os/user"
-	"path/filepath"
-	"strings"
 
 	"git-browser/internal/repository"
 	"git-browser/internal/web"
@@ -15,23 +11,19 @@ import (
 
 func main() {
 	sshUser := flag.String("ssh-user", "git", "SSH user allowed to access repositories")
-	root := flag.String("root", "repos", "repository root relative to the SSH user's home directory")
+	cloneRoot := flag.String("cloneroot", "", "repositories location root used for generating clone URLs (relative to the ssh user's home directory)")
+	root := flag.String("root", "repos", "where the actual repositories are stored (absolute path)")
 	listen := flag.String("listen", ":8080", "HTTP listen address")
 	flag.Parse()
 
-	resolvedRoot, cloneRoot, err := resolveRoot(*sshUser, *root)
-	if err != nil {
-		log.Fatalf("resolve repository root: %v", err)
-	}
-
-	store, err := repository.Discover(resolvedRoot)
+	store, err := repository.Discover(*root)
 	if err != nil {
 		log.Fatalf("discover repositories: %v", err)
 	}
 
 	server, err := web.NewServer(store, web.Config{
 		SSHUser:   *sshUser,
-		CloneRoot: cloneRoot,
+		CloneRoot: *cloneRoot,
 	})
 	if err != nil {
 		log.Fatalf("create server: %v", err)
@@ -41,21 +33,4 @@ func main() {
 	if err := http.ListenAndServe(*listen, server.Handler()); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func resolveRoot(userName, root string) (string, string, error) {
-	account, err := user.Lookup(userName)
-	if err != nil {
-		return "", "", err
-	}
-
-	cleaned := filepath.Clean(root)
-	if root == "" || cleaned == "." {
-		return account.HomeDir, "", nil
-	}
-	if filepath.IsAbs(cleaned) || cleaned == ".." || strings.HasPrefix(cleaned, ".."+string(filepath.Separator)) {
-		return "", "", fmt.Errorf("root must stay within %s's home directory", userName)
-	}
-
-	return filepath.Join(account.HomeDir, cleaned), filepath.ToSlash(cleaned), nil
 }
