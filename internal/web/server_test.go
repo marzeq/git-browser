@@ -240,6 +240,71 @@ func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 	}
 }
 
+func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo.git"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path    string
+		want    []string
+		wantNot []string
+	}{
+		{
+			path:    "/",
+			want:    []string{">demo</a>"},
+			wantNot: []string{">demo.git</a>"},
+		},
+		{
+			path:    "/demo.git",
+			want:    []string{"<title>demo</title>", "<h1><a href=\"/demo.git\">demo</a>"},
+			wantNot: []string{"<title>demo.git</title>", "<h1><a href=\"/demo.git\">demo.git</a>"},
+		},
+		{
+			path:    "/demo.git",
+			want:    []string{"git@localhost:repos/demo.git", "data-copy-text=\"git@localhost:repos/demo.git\""},
+			wantNot: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		req.Host = "localhost:8080"
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+
+		body := rec.Body.String()
+		for _, want := range tc.want {
+			if !strings.Contains(body, want) {
+				t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, want, body)
+			}
+		}
+		for _, wantNot := range tc.wantNot {
+			if strings.Contains(body, wantNot) {
+				t.Fatalf("%s: response unexpectedly contained %q\nbody:\n%s", tc.path, wantNot, body)
+			}
+		}
+	}
+}
+
 func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
 	t.Helper()
 

@@ -205,7 +205,7 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 	items := make([]repoLink, 0, len(repos))
 	for _, repo := range repos {
 		items = append(items, repoLink{
-			Name: repo.Name,
+			Name: displayRepoName(repo.Name),
 			URL:  homeURL(repo.Name),
 		})
 	}
@@ -238,9 +238,10 @@ func (s *Server) repoHome(w http.ResponseWriter, r *http.Request, repoName strin
 }
 
 func (s *Server) renderEmptyRepoPage(w http.ResponseWriter, r *http.Request, repo *repository.Repository) {
+	displayName := displayRepoName(repo.Name())
 	data := repoData{
-		pageData:    pageData{Title: repo.Name()},
-		RepoName:    repo.Name(),
+		pageData:    pageData{Title: displayName},
+		RepoName:    displayName,
 		HomeURL:     homeURL(repo.Name()),
 		CloneURL:    s.cloneURL(r.Host, repo.Name()),
 		Empty:       true,
@@ -297,9 +298,10 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 		})
 	}
 
+	displayName := displayRepoName(repo.Name())
 	data := repoData{
-		pageData:      pageData{Title: repo.Name()},
-		RepoName:      repo.Name(),
+		pageData:      pageData{Title: displayName},
+		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
 		CloneURL:      s.cloneURL(r.Host, repo.Name()),
 		Revision:      rev.Name,
@@ -354,9 +356,10 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		dirPath = ""
 	}
 
+	displayName := displayRepoName(repo.Name())
 	data := blobData{
 		pageData:      pageData{Title: blob.Name},
-		RepoName:      repo.Name(),
+		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
 		CloneURL:      s.cloneURL(r.Host, repo.Name()),
 		Revision:      rev.Name,
@@ -438,9 +441,10 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repoName, tail stri
 		})
 	}
 
+	displayName := displayRepoName(repo.Name())
 	data := logData{
-		pageData:      pageData{Title: fmt.Sprintf("%s log", repo.Name())},
-		RepoName:      repo.Name(),
+		pageData:      pageData{Title: fmt.Sprintf("%s log", displayName)},
+		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
 		CloneURL:      s.cloneURL(r.Host, repo.Name()),
 		Revision:      rev.Name,
@@ -510,9 +514,10 @@ func (s *Server) branches(w http.ResponseWriter, r *http.Request, repoName strin
 		})
 	}
 
+	displayName := displayRepoName(repo.Name())
 	data := branchesData{
-		pageData:    pageData{Title: fmt.Sprintf("%s branches", repo.Name())},
-		RepoName:    repo.Name(),
+		pageData:    pageData{Title: fmt.Sprintf("%s branches", displayName)},
+		RepoName:    displayName,
 		HomeURL:     homeURL(repo.Name()),
 		CloneURL:    s.cloneURL(r.Host, repo.Name()),
 		Empty:       rev == nil,
@@ -720,6 +725,13 @@ func shortHash(hash string) string {
 		return hash
 	}
 	return hash[:7]
+}
+
+func displayRepoName(name string) string {
+	if strings.HasSuffix(name, ".git") && len(name) > len(".git") {
+		return strings.TrimSuffix(name, ".git")
+	}
+	return name
 }
 
 func displayRevision(rev *repository.ResolvedRevision) string {
