@@ -1,0 +1,37 @@
+{{define "log.html"}}{{template "page-start" .}}{{template "repo-header" .}}
+
+{{if .Path}}
+<p class="meta">history for: <strong>{{.Path}}</strong></p>
+<nav class="nav-links">
+  <a href="{{.BackURL}}">back to file</a>
+</nav>
+{{end}}
+
+<table class="listing commits">
+  <thead>
+    <tr>
+      <th>commit</th>
+      <th>author</th>
+      <th>date</th>
+      <th>subject</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Commits}}
+    <tr>
+      <td><a href="{{.URL}}">{{.Hash}}</a></td>
+      <td>{{.Author}}</td>
+      <td>{{.Date}}</td>
+      <td>{{.Subject}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="4">No commits found.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+<nav class="pager">
+  {{if .PreviousURL}}<a href="{{.PreviousURL}}">newer</a>{{end}}
+  {{if .NextURL}}<a href="{{.NextURL}}">older</a>{{end}}
+</nav>
+{{template "copy-script" .}}{{template "page-end" .}}{{end}}

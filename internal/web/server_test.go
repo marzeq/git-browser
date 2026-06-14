@@ -1,0 +1,210 @@
+package web
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"git-browser/internal/repository"
+
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object"
+)
+
+func TestServerRendersCorePages(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo, err := store.Open("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := repo.DefaultRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/", want: "Repositories"},
+		{path: "/demo", want: "git@localhost:repos/demo"},
+		{path: "/demo", want: "data-copy-text=\"git@localhost:repos/demo\""},
+		{path: "/demo", want: "revision: <strong>master</strong>"},
+		{path: "/demo", want: "README.md"},
+		{path: "/demo/blob/" + rev.Name + "/README.md", want: "aria-label=\"Breadcrumb\""},
+		{path: "/demo/log/" + rev.Name, want: "/demo/tree/"},
+		{path: "/demo/log/" + rev.Name + "?path=README.md", want: "back to file"},
+		{path: "/demo/branches", want: "feature"},
+		{path: "/demo/tree/feature/", want: "README.md"},
+		{path: "/demo/tree/feature/", want: "/demo/branches?rev=feature"},
+	}
+
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		req.Host = "localhost:8080"
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
+		}
+	}
+}
+
+func TestServerServesRawBlob(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo, err := store.Open("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := repo.DefaultRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/demo/blob/"+rev.Name+"/README.md?raw=1", nil)
+	req.Host = "localhost:8080"
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	if body := rec.Body.String(); body != "hello\n" {
+		t.Fatalf("got raw body %q, want %q", body, "hello\n")
+	}
+	if contentType := rec.Header().Get("Content-Type"); !strings.Contains(contentType, "text/plain") {
+		t.Fatalf("got content type %q, want text/plain", contentType)
+	}
+}
+
+func TestServerRendersEmptyRepositoryPage(t *testing.T) {
+	root := t.TempDir()
+	if _, err := git.PlainInit(filepath.Join(root, "empty"), false); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneRoot: "",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/empty", want: "This repository has no commits yet."},
+		{path: "/empty/branches", want: "No branches found."},
+	}
+
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		req.Host = "localhost:8080"
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
+		}
+	}
+}
+
+func initRepo(root, name string) error {
+	path := filepath.Join(root, name)
+	repo, err := git.PlainInit(path, false)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(filepath.Join(path, "README.md"), []byte("hello\n"), 0o644); err != nil {
+		return err
+	}
+	if err := os.Mkdir(filepath.Join(path, "src"), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(path, "src", "main.go"), []byte("package main\n"), 0o644); err != nil {
+		return err
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	if _, err := wt.Add("README.md"); err != nil {
+		return err
+	}
+	if _, err := wt.Add("src/main.go"); err != nil {
+		return err
+	}
+
+	hash, err := wt.Commit("initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test",
+			Email: "test@example.com",
+			When:  time.Unix(0, 0),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if err := repo.CreateBranch(&config.Branch{Name: "feature"}); err != nil {
+		return err
+	}
+
+	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("feature"), hash))
+}

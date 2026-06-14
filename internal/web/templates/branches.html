@@ -1,0 +1,21 @@
+{{define "branches.html"}}{{template "page-start" .}}{{template "repo-header" .}}
+
+<table class="listing">
+  <thead>
+    <tr>
+      <th>branch</th>
+      <th>commit</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Branches}}
+    <tr>
+      <td><a href="{{.URL}}">{{.Name}}</a>{{if .Current}} <span class="meta">(current)</span>{{end}}</td>
+      <td>{{.Hash}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="2">No branches found.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "copy-script" .}}{{template "page-end" .}}{{end}}

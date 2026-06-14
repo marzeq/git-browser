@@ -1,0 +1,54 @@
+{{define "page-start"}}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="page">
+{{end}}
+
+{{define "page-end"}}
+</main>
+</body>
+</html>
+{{end}}
+
+{{define "copy-script"}}
+<script src="/static/copy.js"></script>
+{{end}}
+
+{{define "breadcrumbs"}}
+{{if .Breadcrumbs}}
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  {{range $index, $crumb := .Breadcrumbs}}
+  {{if $index}} / {{end}}<a href="{{$crumb.URL}}">{{$crumb.Name}}</a>
+  {{end}}
+</nav>
+{{end}}
+{{end}}
+
+{{define "repo-header"}}
+<header class="site-header">
+  <p class="meta small-link"><a href="/">repos</a></p>
+  <div class="title-row">
+    <h1>{{if .HomeURL}}<a href="{{.HomeURL}}">{{.RepoName}}</a>{{else}}{{.RepoName}}{{end}}{{if not .Empty}} <span class="meta revision-inline">revision: <strong>{{.RevisionLabel}}</strong></span>{{end}}</h1>
+    <p class="meta clone-line">clone: <span class="copy-link" data-copy-text="{{.CloneURL}}"><code>{{.CloneURL}}</code></span></p>
+  </div>
+  {{if .Empty}}
+  <p class="meta">empty repository</p>
+  <nav class="nav-links">
+    <a href="{{.BranchesURL}}">branches</a>
+  </nav>
+  {{else}}
+  <nav class="nav-links">
+    <a href="{{.TreeURL}}">tree</a>
+    <a href="{{.LogURL}}">log</a>
+    <a href="{{.BranchesURL}}">branches</a>
+  </nav>
+  {{end}}
+</header>
+{{end}}

@@ -1,0 +1,9 @@
+{{define "blob.html"}}{{template "page-start" .}}{{template "repo-header" .}}{{template "breadcrumbs" .}}
+
+<nav class="nav-links">
+  <a href="{{.HistoryURL}}">commit history</a>
+  <a href="{{.RawURL}}">raw</a>
+</nav>
+
+<pre>{{.Content}}</pre>
+{{template "copy-script" .}}{{template "page-end" .}}{{end}}

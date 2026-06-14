@@ -1,0 +1,26 @@
+{{define "repo.html"}}{{template "page-start" .}}{{template "repo-header" .}}{{template "breadcrumbs" .}}
+
+{{if .Empty}}
+<p class="meta">This repository has no commits yet.</p>
+{{else}}
+<table class="listing">
+  <tbody>
+    {{range .Entries}}
+    <tr>
+      <td class="entry-kind">{{if .IsDir}}dir{{else}}file{{end}}</td>
+      <td><a href="{{.URL}}">{{.Name}}{{if .IsDir}}/{{end}}</a></td>
+    </tr>
+    {{else}}
+    <tr><td colspan="2">Empty tree.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+
+{{if .Readme}}
+<section class="readme">
+  <h2>{{.ReadmeName}}</h2>
+  <pre>{{.Readme}}</pre>
+</section>
+{{end}}
+{{end}}
+{{template "copy-script" .}}{{template "page-end" .}}{{end}}

@@ -1,0 +1,13 @@
+{{define "index.html"}}{{template "page-start" .}}
+<header class="site-header">
+  <h1>Repositories</h1>
+</header>
+
+<ul class="repo-list">
+  {{range .Repos}}
+  <li><a href="{{.URL}}">{{.Name}}</a></li>
+  {{else}}
+  <li>No repositories found.</li>
+  {{end}}
+</ul>
+{{template "page-end" .}}{{end}}
