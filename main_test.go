@@ -3,6 +3,7 @@ package main
 import (
 	"os/user"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -37,4 +38,13 @@ func TestResolveRoot(t *testing.T) {
 			t.Fatalf("got clone root %q", cloneRoot)
 		}
 	})
+}
+
+func TestParseHiddenRepositories(t *testing.T) {
+	hidden := parseHiddenRepositories(" alpha ;beta;; gamma/delta ")
+
+	want := []string{"alpha", "beta", "gamma/delta"}
+	if !reflect.DeepEqual(hidden, want) {
+		t.Fatalf("got hidden repositories %#v, want %#v", hidden, want)
+	}
 }

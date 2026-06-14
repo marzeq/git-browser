@@ -40,6 +40,33 @@ func TestDiscoverListsDirectRepositories(t *testing.T) {
 	}
 }
 
+func TestDiscoverSkipsHiddenRepositories(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	if err := initRepo(root, "beta"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root, "beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repos := store.List()
+	if len(repos) != 1 {
+		t.Fatalf("got %d repositories, want 1", len(repos))
+	}
+	if repos[0].Name != "alpha" {
+		t.Fatalf("got repository %q, want %q", repos[0].Name, "alpha")
+	}
+
+	if _, err := store.Open("beta"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("got error %v, want %v", err, os.ErrNotExist)
+	}
+}
+
 func TestResolveRevisionAndReadme(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "demo"); err != nil {

@@ -77,6 +77,39 @@ func TestServerRendersCorePages(t *testing.T) {
 	}
 }
 
+func TestServerUsesConfiguredCloneHost(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneHost: "git.example.com",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/demo", nil)
+	req.Host = "localhost:8080"
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	if !strings.Contains(rec.Body.String(), "git@git.example.com:repos/demo") {
+		t.Fatalf("response did not contain overridden clone URL\nbody:\n%s", rec.Body.String())
+	}
+}
+
 func TestServerServesRawBlob(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "demo"); err != nil {

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
@@ -23,10 +24,19 @@ type Store struct {
 	cache map[string]*Repository
 }
 
-func Discover(root string) (*Store, error) {
+func Discover(root string, hiddenRepos ...string) (*Store, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return nil, err
+	}
+
+	hidden := make(map[string]struct{}, len(hiddenRepos))
+	for _, repo := range hiddenRepos {
+		name := strings.TrimSpace(repo)
+		if name == "" {
+			continue
+		}
+		hidden[name] = struct{}{}
 	}
 
 	repos := make(map[string]Info)
@@ -36,6 +46,9 @@ func Discover(root string) (*Store, error) {
 		}
 
 		name := entry.Name()
+		if _, ok := hidden[name]; ok {
+			continue
+		}
 		path := filepath.Join(root, name)
 		if _, err := git.PlainOpen(path); err != nil {
 			if errors.Is(err, git.ErrRepositoryNotExists) {

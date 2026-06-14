@@ -29,6 +29,7 @@ type Server struct {
 
 type Config struct {
 	SSHUser   string
+	CloneHost string
 	CloneRoot string
 }
 
@@ -96,8 +97,8 @@ type blobData struct {
 	CloneURL      string
 	Revision      string
 	RevisionLabel string
-	Empty        bool
-	TreeURL      string
+	Empty         bool
+	TreeURL       string
 	LogURL        string
 	BranchesURL   string
 	Breadcrumbs   []breadcrumb
@@ -116,8 +117,8 @@ type logData struct {
 	CloneURL      string
 	Revision      string
 	RevisionLabel string
-	Empty       bool
-	TreeURL     string
+	Empty         bool
+	TreeURL       string
 	LogURL        string
 	BranchesURL   string
 	Path          string
@@ -684,6 +685,9 @@ func (s *Server) cloneURL(host, repoName string) string {
 	base := repoName
 	if s.config.CloneRoot != "" {
 		base = path.Join(s.config.CloneRoot, repoName)
+	}
+	if s.config.CloneHost != "" {
+		host = s.config.CloneHost
 	}
 	return fmt.Sprintf("%s@%s:%s", s.config.SSHUser, sshHost(host), base)
 }
