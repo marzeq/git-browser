@@ -136,6 +136,57 @@ func TestDefaultRevisionReturnsEmptyRepositoryError(t *testing.T) {
 	}
 }
 
+func TestStoreRefreshUpdatesDiscoveredRepositories(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := initRepo(root, "beta"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+
+	repos := store.List()
+	if len(repos) != 2 {
+		t.Fatalf("got %d repositories, want 2", len(repos))
+	}
+	if repos[0].Name != "alpha" || repos[1].Name != "beta" {
+		t.Fatalf("unexpected repositories after refresh: %#v", repos)
+	}
+}
+
+func TestStorePeriodicRefreshUpdatesDiscoveredRepositories(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stop := store.StartPeriodicRefresh(10*time.Millisecond, nil)
+	defer stop()
+
+	if err := initRepo(root, "beta"); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForCondition(t, 2*time.Second, func() bool {
+		repos := store.List()
+		return len(repos) == 2 && repos[0].Name == "alpha" && repos[1].Name == "beta"
+	})
+}
+
 func TestLogOrdersMergeHistoryByCommitterTime(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepoWithMergeHistory(root, "demo"); err != nil {
@@ -183,6 +234,20 @@ func TestLogOrdersMergeHistoryByCommitterTime(t *testing.T) {
 			t.Fatalf("commit %d = %q, want %q; full order: %#v", i, messages[i], wantMessage, messages)
 		}
 	}
+}
+
+func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if check() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatal("condition was not met before timeout")
 }
 
 func initRepo(root, name string) error {

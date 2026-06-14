@@ -110,6 +110,50 @@ func TestServerUsesConfiguredCloneHost(t *testing.T) {
 	}
 }
 
+func TestServerRefreshesRepositoryListBetweenRequests(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		SSHUser:   "git",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first := httptest.NewRequest(http.MethodGet, "/", nil)
+	first.Host = "localhost:8080"
+	firstRec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(firstRec, first)
+
+	if firstRec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", firstRec.Code, http.StatusOK)
+	}
+	if strings.Contains(firstRec.Body.String(), "beta") {
+		t.Fatalf("unexpected repository in initial response\nbody:\n%s", firstRec.Body.String())
+	}
+
+	if err := initRepo(root, "beta"); err != nil {
+		t.Fatal(err)
+	}
+
+	waitForCondition(t, 2*time.Second, func() bool {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Host = "localhost:8080"
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+		return rec.Code == http.StatusOK && strings.Contains(rec.Body.String(), "beta")
+	})
+}
+
 func TestServerServesRawBlob(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "demo"); err != nil {
@@ -194,6 +238,20 @@ func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
 		}
 	}
+}
+
+func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if check() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	t.Fatal("condition was not met before timeout")
 }
 
 func initRepo(root, name string) error {

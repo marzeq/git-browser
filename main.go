@@ -7,6 +7,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"git-browser/internal/repository"
 	"git-browser/internal/web"
@@ -25,6 +26,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("discover repositories: %v", err)
 	}
+	stopRefresh := store.StartPeriodicRefresh(5*time.Minute, func(err error) {
+		log.Printf("refresh repositories: %v", err)
+	})
+	defer stopRefresh()
 
 	server, err := web.NewServer(store, web.Config{
 		SSHUser:   *sshUser,

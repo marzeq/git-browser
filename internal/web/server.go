@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -157,7 +158,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/static/style.css", s.serveStyle)
 	mux.HandleFunc("/static/copy.js", s.serveCopyScript)
 	mux.HandleFunc("/", s.route)
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/static/") {
+			s.store.RefreshAsync(func(err error) {
+				log.Printf("refresh repositories: %v", err)
+			})
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) route(w http.ResponseWriter, r *http.Request) {
