@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -29,9 +28,13 @@ type Server struct {
 }
 
 type Config struct {
-	CloneUser string
-	CloneHost string
-	CloneRoot string
+	CloneSSHPrefix   string
+	CloneHTTPSPrefix string
+}
+
+type cloneLink struct {
+	Label string
+	URL   string
 }
 
 type breadcrumb struct {
@@ -78,7 +81,7 @@ type repoData struct {
 	pageData
 	RepoName      string
 	HomeURL       string
-	CloneURL      string
+	CloneURLs     []cloneLink
 	Revision      string
 	RevisionLabel string
 	Empty         bool
@@ -95,7 +98,7 @@ type blobData struct {
 	pageData
 	RepoName      string
 	HomeURL       string
-	CloneURL      string
+	CloneURLs     []cloneLink
 	Revision      string
 	RevisionLabel string
 	Empty         bool
@@ -115,7 +118,7 @@ type logData struct {
 	pageData
 	RepoName      string
 	HomeURL       string
-	CloneURL      string
+	CloneURLs     []cloneLink
 	Revision      string
 	RevisionLabel string
 	Empty         bool
@@ -134,7 +137,7 @@ type branchesData struct {
 	pageData
 	RepoName      string
 	HomeURL       string
-	CloneURL      string
+	CloneURLs     []cloneLink
 	Revision      string
 	RevisionLabel string
 	Empty         bool
@@ -243,7 +246,7 @@ func (s *Server) renderEmptyRepoPage(w http.ResponseWriter, r *http.Request, rep
 		pageData:    pageData{Title: displayName},
 		RepoName:    displayName,
 		HomeURL:     homeURL(repo.Name()),
-		CloneURL:    s.cloneURL(r.Host, repo.Name()),
+		CloneURLs:   s.cloneURLs(repo.Name()),
 		Empty:       true,
 		BranchesURL: branchesURL(repo.Name(), ""),
 	}
@@ -303,7 +306,7 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 		pageData:      pageData{Title: displayName},
 		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
-		CloneURL:      s.cloneURL(r.Host, repo.Name()),
+		CloneURLs:     s.cloneURLs(repo.Name()),
 		Revision:      rev.Name,
 		RevisionLabel: displayRevision(rev),
 		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, treePath),
@@ -361,7 +364,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		pageData:      pageData{Title: blob.Name},
 		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
-		CloneURL:      s.cloneURL(r.Host, repo.Name()),
+		CloneURLs:     s.cloneURLs(repo.Name()),
 		Revision:      rev.Name,
 		RevisionLabel: displayRevision(rev),
 		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, dirPath),
@@ -446,7 +449,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repoName, tail stri
 		pageData:      pageData{Title: fmt.Sprintf("%s log", displayName)},
 		RepoName:      displayName,
 		HomeURL:       homeURL(repo.Name()),
-		CloneURL:      s.cloneURL(r.Host, repo.Name()),
+		CloneURLs:     s.cloneURLs(repo.Name()),
 		Revision:      rev.Name,
 		RevisionLabel: displayRevision(rev),
 		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, ""),
@@ -519,7 +522,7 @@ func (s *Server) branches(w http.ResponseWriter, r *http.Request, repoName strin
 		pageData:    pageData{Title: fmt.Sprintf("%s branches", displayName)},
 		RepoName:    displayName,
 		HomeURL:     homeURL(repo.Name()),
-		CloneURL:    s.cloneURL(r.Host, repo.Name()),
+		CloneURLs:   s.cloneURLs(repo.Name()),
 		Empty:       rev == nil,
 		BranchesURL: branchesURL(repo.Name(), selectedRevision),
 		Branches:    items,
@@ -694,22 +697,21 @@ func logURL(repoName, revision, filePath string, page int) string {
 	return base + "?" + query
 }
 
-func (s *Server) cloneURL(host, repoName string) string {
-	base := repoName
-	if s.config.CloneRoot != "" {
-		base = path.Join(s.config.CloneRoot, repoName)
+func (s *Server) cloneURLs(repoName string) []cloneLink {
+	urls := make([]cloneLink, 0, 2)
+	if prefix := strings.TrimSpace(s.config.CloneSSHPrefix); prefix != "" {
+		urls = append(urls, cloneLink{
+			Label: "ssh",
+			URL:   prefix + repoName,
+		})
 	}
-	if s.config.CloneHost != "" {
-		host = s.config.CloneHost
+	if prefix := strings.TrimSpace(s.config.CloneHTTPSPrefix); prefix != "" {
+		urls = append(urls, cloneLink{
+			Label: "https",
+			URL:   prefix + repoName,
+		})
 	}
-	return fmt.Sprintf("%s@%s:%s", s.config.CloneUser, sshHost(host), base)
-}
-
-func sshHost(host string) string {
-	if parsed, _, err := net.SplitHostPort(host); err == nil {
-		host = parsed
-	}
-	return strings.Trim(host, "[]")
+	return urls
 }
 
 func escapeSlashed(value string) string {

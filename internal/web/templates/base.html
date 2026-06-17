@@ -36,7 +36,13 @@
   <p class="meta small-link"><a href="/">repos</a></p>
   <div class="title-row">
     <h1>{{if .HomeURL}}<a href="{{.HomeURL}}">{{.RepoName}}</a>{{else}}{{.RepoName}}{{end}}{{if not .Empty}} <span class="meta revision-inline">revision: <strong>{{.RevisionLabel}}</strong></span>{{end}}</h1>
-    <p class="meta clone-line">clone: <span class="copy-link" data-copy-text="{{.CloneURL}}"><code>{{.CloneURL}}</code></span></p>
+    {{if .CloneURLs}}
+    <div class="clone-lines">
+      {{range .CloneURLs}}
+      <p class="meta clone-line">clone {{.Label}}: <span class="copy-link" data-copy-text="{{.URL}}"><code>{{.URL}}</code></span></p>
+      {{end}}
+    </div>
+    {{end}}
   </div>
   {{if .Empty}}
   <p class="meta">empty repository</p>

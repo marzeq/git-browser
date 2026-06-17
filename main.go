@@ -14,9 +14,8 @@ import (
 )
 
 func main() {
-	cloneUser := flag.String("clone-user", "git", "SSH user allowed to access repositories")
-	cloneHost := flag.String("clone-host", "", "hostname used for generating clone URLs (defaults to the request host)")
-	cloneRoot := flag.String("clone-root", "", "repositories location root used for generating clone URLs (relative to the ssh user's home directory)")
+	cloneSSHPrefix := flag.String("clone-ssh-prefix", "", "prefix used for generating SSH clone URLs; the repository name is appended to it")
+	cloneHTTPSPrefix := flag.String("clone-https-prefix", "", "prefix used for generating HTTPS clone URLs; the repository name is appended to it")
 	root := flag.String("root", "repos", "where the actual repositories are stored (absolute path or relative to the current user's home directory)")
 	hide := flag.String("hide", "", "semicolon-separated list of repositories to hide from the UI")
 	listen := flag.String("listen", ":8080", "HTTP listen address")
@@ -27,12 +26,9 @@ func main() {
 		log.Fatalf("resolve current user: %v", err)
 	}
 
-	resolvedRoot, defaultCloneRoot, err := resolveRoot(current.Username, *root)
+	resolvedRoot, _, err := resolveRoot(current.Username, *root)
 	if err != nil {
 		log.Fatalf("resolve root: %v", err)
-	}
-	if *cloneRoot == "" {
-		*cloneRoot = defaultCloneRoot
 	}
 
 	store, err := repository.Discover(resolvedRoot, parseHiddenRepositories(*hide)...)
@@ -45,9 +41,8 @@ func main() {
 	defer stopRefresh()
 
 	server, err := web.NewServer(store, web.Config{
-		CloneUser: *cloneUser,
-		CloneHost: *cloneHost,
-		CloneRoot: *cloneRoot,
+		CloneSSHPrefix:   *cloneSSHPrefix,
+		CloneHTTPSPrefix: *cloneHTTPSPrefix,
 	})
 	if err != nil {
 		log.Fatalf("create server: %v", err)

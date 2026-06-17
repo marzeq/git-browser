@@ -90,6 +90,12 @@ textarea {
   white-space: nowrap;
 }
 
+.clone-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
 .copy-link {
   color: inherit;
 }
@@ -188,6 +194,10 @@ pre {
   .clone-line {
     margin-left: 0;
     white-space: normal;
+  }
+
+  .clone-lines {
+    align-items: flex-start;
   }
 
   .listing,

@@ -29,8 +29,7 @@ func TestServerRendersCorePages(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "repos",
+		CloneSSHPrefix: "git@localhost:repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -50,8 +49,7 @@ func TestServerRendersCorePages(t *testing.T) {
 		want string
 	}{
 		{path: "/", want: "Repositories"},
-		{path: "/demo", want: "git@localhost:repos/demo"},
-		{path: "/demo", want: "data-copy-text=\"git@localhost:repos/demo\""},
+		{path: "/demo", want: "clone ssh: <span class=\"copy-link\" data-copy-text=\"git@localhost:repos/demo\"><code>git@localhost:repos/demo</code></span>"},
 		{path: "/demo", want: "revision: <strong>master</strong>"},
 		{path: "/demo", want: "README.md"},
 		{path: "/demo/blob/" + rev.Name + "/README.md", want: "aria-label=\"Breadcrumb\""},
@@ -77,7 +75,7 @@ func TestServerRendersCorePages(t *testing.T) {
 	}
 }
 
-func TestServerUsesConfiguredCloneHost(t *testing.T) {
+func TestServerRendersConfiguredClonePrefixes(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "demo"); err != nil {
 		t.Fatal(err)
@@ -89,9 +87,8 @@ func TestServerUsesConfiguredCloneHost(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneHost: "git.example.com",
-		CloneRoot: "repos",
+		CloneSSHPrefix:   "ssh://git.example.com/repos/",
+		CloneHTTPSPrefix: "https://git.example.com/repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -105,8 +102,16 @@ func TestServerUsesConfiguredCloneHost(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
 	}
-	if !strings.Contains(rec.Body.String(), "git@git.example.com:repos/demo") {
-		t.Fatalf("response did not contain overridden clone URL\nbody:\n%s", rec.Body.String())
+	body := rec.Body.String()
+	for _, want := range []string{
+		"ssh://git.example.com/repos/demo",
+		"https://git.example.com/repos/demo",
+		"clone ssh:",
+		"clone https:",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response did not contain %q\nbody:\n%s", want, body)
+		}
 	}
 }
 
@@ -122,8 +127,7 @@ func TestServerRefreshesRepositoryListBetweenRequests(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "repos",
+		CloneSSHPrefix: "git@localhost:repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -166,8 +170,7 @@ func TestServerServesRawBlob(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "repos",
+		CloneSSHPrefix: "git@localhost:repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -210,8 +213,7 @@ func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "",
+		CloneSSHPrefix: "",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -237,6 +239,38 @@ func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), tc.want) {
 			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
 		}
+		if strings.Contains(rec.Body.String(), "clone ssh:") || strings.Contains(rec.Body.String(), "clone https:") {
+			t.Fatalf("%s: response unexpectedly contained clone URL block\nbody:\n%s", tc.path, rec.Body.String())
+		}
+	}
+}
+
+func TestServerOmitsCloneURLsWhenUnconfigured(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/demo", nil)
+	req.Host = "localhost:8080"
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	if strings.Contains(rec.Body.String(), "clone ssh:") || strings.Contains(rec.Body.String(), "clone https:") {
+		t.Fatalf("response unexpectedly contained clone URL block\nbody:\n%s", rec.Body.String())
 	}
 }
 
@@ -252,8 +286,7 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "repos",
+		CloneSSHPrefix: "git@localhost:repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -276,7 +309,7 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 		},
 		{
 			path:    "/demo.git",
-			want:    []string{"git@localhost:repos/demo.git", "data-copy-text=\"git@localhost:repos/demo.git\""},
+			want:    []string{"git@localhost:repos/demo.git", "data-copy-text=\"git@localhost:repos/demo.git\"", "clone ssh:"},
 			wantNot: nil,
 		},
 	}
@@ -317,8 +350,7 @@ func TestServerSupportsNestedRepositoryPaths(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		CloneUser: "git",
-		CloneRoot: "repos",
+		CloneSSHPrefix: "git@localhost:repos/",
 	})
 	if err != nil {
 		t.Fatal(err)
