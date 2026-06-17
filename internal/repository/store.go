@@ -95,6 +95,31 @@ func (s *Store) Open(name string) (*Repository, error) {
 	return repo, nil
 }
 
+func (s *Store) SplitPath(raw string) (string, string, bool) {
+	clean := strings.Trim(strings.TrimSpace(raw), "/")
+	if clean == "" {
+		return "", "", false
+	}
+
+	parts := strings.Split(clean, "/")
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for i := len(parts); i >= 1; i-- {
+		candidate := strings.Join(parts[:i], "/")
+		if _, ok := s.repos[candidate]; !ok {
+			continue
+		}
+		if i == len(parts) {
+			return candidate, "", true
+		}
+		return candidate, "/" + strings.Join(parts[i:], "/"), true
+	}
+
+	return "", "", false
+}
+
 func (s *Store) Refresh() error {
 	repos, err := discoverRepos(s.root, s.hidden)
 	if err != nil {
@@ -162,7 +187,7 @@ func (s *Store) StartPeriodicRefresh(interval time.Duration, onError func(error)
 func normalizeHiddenRepos(hiddenRepos []string) map[string]struct{} {
 	hidden := make(map[string]struct{}, len(hiddenRepos))
 	for _, repo := range hiddenRepos {
-		name := strings.TrimSpace(repo)
+		name := strings.Trim(filepath.ToSlash(strings.TrimSpace(repo)), "/")
 		if name == "" {
 			continue
 		}
@@ -183,20 +208,48 @@ func discoverRepos(root string, hidden map[string]struct{}) (map[string]Info, er
 			continue
 		}
 
-		name := entry.Name()
-		if _, ok := hidden[name]; ok {
+		found, err := appendRepo(repos, hidden, root, entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if found {
 			continue
 		}
-		path := filepath.Join(root, name)
-		if _, err := git.PlainOpen(path); err != nil {
-			if errors.Is(err, git.ErrRepositoryNotExists) {
+
+		children, err := os.ReadDir(filepath.Join(root, entry.Name()))
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 			return nil, err
 		}
-
-		repos[name] = Info{Name: name, Path: path}
+		for _, child := range children {
+			if !child.IsDir() {
+				continue
+			}
+			if _, err := appendRepo(repos, hidden, root, entry.Name(), child.Name()); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return repos, nil
+}
+
+func appendRepo(repos map[string]Info, hidden map[string]struct{}, root string, parts ...string) (bool, error) {
+	name := filepath.ToSlash(filepath.Join(parts...))
+	repoPath := filepath.Join(append([]string{root}, parts...)...)
+	if _, err := git.PlainOpen(repoPath); err != nil {
+		if errors.Is(err, git.ErrRepositoryNotExists) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if _, ok := hidden[name]; ok {
+		return true, nil
+	}
+
+	repos[name] = Info{Name: name, Path: repoPath}
+	return true, nil
 }

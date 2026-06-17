@@ -2,7 +2,7 @@
 
 Minimal web UI for browsing local Git repositories.
 
-`git-browser` scans a directory for Git repositories and serves a small read-only interface for:
+`git-browser` scans a directory for Git repositories directly under the configured root or one level below it in organization/user folders, and serves a small read-only interface for:
 
 - listing repositories
 - browsing trees and files at any branch, tag, or commit

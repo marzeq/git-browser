@@ -29,7 +29,7 @@ func TestServerRendersCorePages(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneRoot: "repos",
 	})
 	if err != nil {
@@ -89,7 +89,7 @@ func TestServerUsesConfiguredCloneHost(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneHost: "git.example.com",
 		CloneRoot: "repos",
 	})
@@ -122,7 +122,7 @@ func TestServerRefreshesRepositoryListBetweenRequests(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneRoot: "repos",
 	})
 	if err != nil {
@@ -166,7 +166,7 @@ func TestServerServesRawBlob(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneRoot: "repos",
 	})
 	if err != nil {
@@ -210,7 +210,7 @@ func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneRoot: "",
 	})
 	if err != nil {
@@ -252,7 +252,7 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 	}
 
 	server, err := NewServer(store, Config{
-		SSHUser:   "git",
+		CloneUser: "git",
 		CloneRoot: "repos",
 	})
 	if err != nil {
@@ -305,6 +305,59 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 	}
 }
 
+func TestServerSupportsNestedRepositoryPaths(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, filepath.Join("acme", "demo.git")); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	server, err := NewServer(store, Config{
+		CloneUser: "git",
+		CloneRoot: "repos",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repo, err := store.Open("acme/demo.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := repo.DefaultRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/", want: "href=\"/acme/demo.git\""},
+		{path: "/acme/demo.git", want: "git@localhost:repos/acme/demo.git"},
+		{path: "/acme/demo.git/tree/" + rev.Name + "/", want: "README.md"},
+		{path: "/acme/demo.git/blob/" + rev.Name + "/README.md?raw=1", want: "hello\n"},
+	}
+
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		req.Host = "localhost:8080"
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
+		}
+	}
+}
+
 func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
 	t.Helper()
 
@@ -321,6 +374,9 @@ func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
 
 func initRepo(root, name string) error {
 	path := filepath.Join(root, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	repo, err := git.PlainInit(path, false)
 	if err != nil {
 		return err

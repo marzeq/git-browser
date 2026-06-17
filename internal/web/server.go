@@ -29,7 +29,7 @@ type Server struct {
 }
 
 type Config struct {
-	SSHUser   string
+	CloneUser string
 	CloneHost string
 	CloneRoot string
 }
@@ -174,8 +174,8 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	repoName, rest := shiftPath(r.URL.Path)
-	if repoName == "" {
+	repoName, rest, ok := s.store.SplitPath(r.URL.Path)
+	if !ok {
 		http.NotFound(w, r)
 		return
 	}
@@ -663,7 +663,7 @@ func branchesURL(repoName, revision string) string {
 }
 
 func homeURL(repoName string) string {
-	return "/" + url.PathEscape(repoName)
+	return "/" + escapeSlashed(repoName)
 }
 
 func objectURL(repoName, section, revision, objectPath string) string {
@@ -702,7 +702,7 @@ func (s *Server) cloneURL(host, repoName string) string {
 	if s.config.CloneHost != "" {
 		host = s.config.CloneHost
 	}
-	return fmt.Sprintf("%s@%s:%s", s.config.SSHUser, sshHost(host), base)
+	return fmt.Sprintf("%s@%s:%s", s.config.CloneUser, sshHost(host), base)
 }
 
 func sshHost(host string) string {

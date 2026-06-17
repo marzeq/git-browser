@@ -40,6 +40,35 @@ func TestDiscoverListsDirectRepositories(t *testing.T) {
 	}
 }
 
+func TestDiscoverListsNestedRepositoriesOneLevelDeep(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "alpha"); err != nil {
+		t.Fatal(err)
+	}
+	if err := initRepo(root, filepath.Join("acme", "beta")); err != nil {
+		t.Fatal(err)
+	}
+	if err := initRepo(root, filepath.Join("acme", "gamma.git")); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repos := store.List()
+	if len(repos) != 3 {
+		t.Fatalf("got %d repositories, want 3", len(repos))
+	}
+
+	got := []string{repos[0].Name, repos[1].Name, repos[2].Name}
+	want := []string{"acme/beta", "acme/gamma.git", "alpha"}
+	if got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
+		t.Fatalf("got repositories %#v, want %#v", got, want)
+	}
+}
+
 func TestDiscoverSkipsHiddenRepositories(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "alpha"); err != nil {
@@ -63,6 +92,33 @@ func TestDiscoverSkipsHiddenRepositories(t *testing.T) {
 	}
 
 	if _, err := store.Open("beta"); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("got error %v, want %v", err, os.ErrNotExist)
+	}
+}
+
+func TestDiscoverSkipsHiddenNestedRepositories(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, filepath.Join("acme", "alpha")); err != nil {
+		t.Fatal(err)
+	}
+	if err := initRepo(root, filepath.Join("acme", "beta")); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root, "acme/beta")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	repos := store.List()
+	if len(repos) != 1 {
+		t.Fatalf("got %d repositories, want 1", len(repos))
+	}
+	if repos[0].Name != "acme/alpha" {
+		t.Fatalf("got repository %q, want %q", repos[0].Name, "acme/alpha")
+	}
+
+	if _, err := store.Open("acme/beta"); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("got error %v, want %v", err, os.ErrNotExist)
 	}
 }
@@ -252,6 +308,9 @@ func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
 
 func initRepo(root, name string) error {
 	path := filepath.Join(root, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
 	repo, err := git.PlainInit(path, false)
 	if err != nil {
 		return err
