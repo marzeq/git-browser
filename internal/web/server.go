@@ -193,7 +193,9 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	case "tree":
 		s.tree(w, r, repoName, tail)
 	case "blob":
-		s.blob(w, r, repoName, tail)
+		s.blob(w, r, repoName, tail, false)
+	case "raw":
+		s.raw(w, r, repoName, tail)
 	case "log":
 		s.log(w, r, repoName, tail)
 	case "branches":
@@ -326,7 +328,17 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 	s.render(w, "repo.html", data)
 }
 
-func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail string) {
+func (s *Server) raw(w http.ResponseWriter, r *http.Request, repoName, tail string) {
+	section, sectionTail := shiftPath(tail)
+	if section != "blob" {
+		http.NotFound(w, r)
+		return
+	}
+
+	s.blob(w, r, repoName, sectionTail, true)
+}
+
+func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail string, forceRaw bool) {
 	repo, err := s.store.Open(repoName)
 	if err != nil {
 		s.writeRepoError(w, r, err)
@@ -349,7 +361,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		return
 	}
 
-	if r.URL.Query().Get("raw") != "" || !blob.Text {
+	if forceRaw || r.URL.Query().Get("raw") != "" || !blob.Text {
 		s.serveRawBlob(w, r, blob)
 		return
 	}
@@ -373,7 +385,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		FilePath:      filePath,
 		DirectoryURL:  objectURL(repo.Name(), "tree", rev.Name, dirPath),
 		HistoryURL:    logURL(repo.Name(), rev.Name, filePath, 0),
-		RawURL:        objectURL(repo.Name(), "blob", rev.Name, filePath) + "?raw=1",
+		RawURL:        rawObjectURL(repo.Name(), "blob", rev.Name, filePath),
 		Content:       string(blob.Content),
 		ContentType:   blob.ContentType,
 	}
@@ -675,6 +687,14 @@ func objectURL(repoName, section, revision, objectPath string) string {
 		if section == "tree" {
 			return base + "/"
 		}
+		return base
+	}
+	return base + "/" + escapeSlashed(objectPath)
+}
+
+func rawObjectURL(repoName, section, revision, objectPath string) string {
+	base := homeURL(repoName) + "/raw/" + section + "/" + escapeSlashed(revision)
+	if objectPath == "" {
 		return base
 	}
 	return base + "/" + escapeSlashed(objectPath)

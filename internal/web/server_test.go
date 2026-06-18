@@ -53,6 +53,7 @@ func TestServerRendersCorePages(t *testing.T) {
 		{path: "/demo", want: "revision: <strong>master</strong>"},
 		{path: "/demo", want: "README.md"},
 		{path: "/demo/blob/" + rev.Name + "/README.md", want: "aria-label=\"Breadcrumb\""},
+		{path: "/demo/blob/" + rev.Name + "/README.md", want: "/demo/raw/blob/" + rev.Name + "/README.md"},
 		{path: "/demo/log/" + rev.Name, want: "/demo/tree/"},
 		{path: "/demo/log/" + rev.Name + "?path=README.md", want: "back to file"},
 		{path: "/demo/branches", want: "feature"},
@@ -185,7 +186,7 @@ func TestServerServesRawBlob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/demo/blob/"+rev.Name+"/README.md?raw=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/demo/raw/blob/"+rev.Name+"/README.md", nil)
 	req.Host = "localhost:8080"
 	rec := httptest.NewRecorder()
 	server.Handler().ServeHTTP(rec, req)
@@ -372,7 +373,7 @@ func TestServerSupportsNestedRepositoryPaths(t *testing.T) {
 		{path: "/", want: "href=\"/acme/demo.git\""},
 		{path: "/acme/demo.git", want: "git@localhost:repos/acme/demo.git"},
 		{path: "/acme/demo.git/tree/" + rev.Name + "/", want: "README.md"},
-		{path: "/acme/demo.git/blob/" + rev.Name + "/README.md?raw=1", want: "hello\n"},
+		{path: "/acme/demo.git/raw/blob/" + rev.Name + "/README.md", want: "hello\n"},
 	}
 
 	for _, tc := range tests {
