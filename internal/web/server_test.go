@@ -14,6 +14,8 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/filemode"
+	"github.com/go-git/go-git/v5/plumbing/format/index"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
@@ -73,6 +75,45 @@ func TestServerRendersCorePages(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), tc.want) {
 			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
 		}
+	}
+}
+
+func TestServerRendersSubmoduleAsPlainTextWithLocation(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+	if err := addSubmodule(filepath.Join(root, "demo"), "widgets", "https://example.com/acme/widgets.git"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := NewServer(store, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/demo", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("got status %d, want %d", rec.Code, http.StatusOK)
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		`<td class="entry-kind">submodule</td>`,
+		`widgets <span class="meta">&rarr; https://example.com/acme/widgets.git</span>`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("response did not contain %q\nbody:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, `href="/demo/blob/master/widgets"`) {
+		t.Fatalf("submodule was rendered as a blob link\nbody:\n%s", body)
 	}
 }
 
@@ -275,7 +316,7 @@ func TestServerOmitsCloneURLsWhenUnconfigured(t *testing.T) {
 	}
 }
 
-func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
+func TestServerUsesExtensionlessURLsForDotGitRepositories(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "demo.git"); err != nil {
 		t.Fatal(err)
@@ -292,26 +333,48 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	repo, err := store.Open("demo.git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := repo.DefaultRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
-		path    string
-		want    []string
-		wantNot []string
+		path     string
+		status   int
+		location string
+		want     []string
+		wantNot  []string
 	}{
 		{
 			path:    "/",
-			want:    []string{">demo</a>"},
-			wantNot: []string{">demo.git</a>"},
+			status:  http.StatusOK,
+			want:    []string{`href="/demo"`, ">demo</a>"},
+			wantNot: []string{`href="/demo.git"`, ">demo.git</a>"},
 		},
 		{
-			path:    "/demo.git",
-			want:    []string{"<title>demo</title>", "<h1><a href=\"/demo.git\">demo</a>"},
-			wantNot: []string{"<title>demo.git</title>", "<h1><a href=\"/demo.git\">demo.git</a>"},
+			path:   "/demo",
+			status: http.StatusOK,
+			want: []string{
+				"<title>demo</title>",
+				`<h1><a href="/demo">demo</a>`,
+				`href="/demo/tree/`,
+				"git@localhost:repos/demo.git",
+			},
+			wantNot: []string{`href="/demo.git/`},
 		},
 		{
-			path:    "/demo.git",
-			want:    []string{"git@localhost:repos/demo.git", "data-copy-text=\"git@localhost:repos/demo.git\"", "clone ssh:"},
-			wantNot: nil,
+			path:     "/demo.git",
+			status:   http.StatusPermanentRedirect,
+			location: "/demo",
+		},
+		{
+			path:     "/demo.git/tree/" + rev.Name + "/src?view=compact",
+			status:   http.StatusPermanentRedirect,
+			location: "/demo/tree/" + rev.Name + "/src?view=compact",
 		},
 	}
 
@@ -321,8 +384,11 @@ func TestServerStripsDotGitSuffixOnlyInUI(t *testing.T) {
 		rec := httptest.NewRecorder()
 		server.Handler().ServeHTTP(rec, req)
 
-		if rec.Code != http.StatusOK {
-			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		if rec.Code != tc.status {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, tc.status)
+		}
+		if location := rec.Header().Get("Location"); location != tc.location {
+			t.Fatalf("%s: got redirect location %q, want %q", tc.path, location, tc.location)
 		}
 
 		body := rec.Body.String()
@@ -370,10 +436,10 @@ func TestServerSupportsNestedRepositoryPaths(t *testing.T) {
 		path string
 		want string
 	}{
-		{path: "/", want: "href=\"/acme/demo.git\""},
-		{path: "/acme/demo.git", want: "git@localhost:repos/acme/demo.git"},
-		{path: "/acme/demo.git/tree/" + rev.Name + "/", want: "README.md"},
-		{path: "/acme/demo.git/raw/blob/" + rev.Name + "/README.md", want: "hello\n"},
+		{path: "/", want: "href=\"/acme/demo\""},
+		{path: "/acme/demo", want: "git@localhost:repos/acme/demo.git"},
+		{path: "/acme/demo/tree/" + rev.Name + "/", want: "README.md"},
+		{path: "/acme/demo/raw/blob/" + rev.Name + "/README.md", want: "hello\n"},
 	}
 
 	for _, tc := range tests {
@@ -452,4 +518,49 @@ func initRepo(root, name string) error {
 	}
 
 	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("feature"), hash))
+}
+
+func addSubmodule(repoPath, modulePath, location string) error {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return err
+	}
+	head, err := repo.Head()
+	if err != nil {
+		return err
+	}
+
+	modules := "[submodule \"widgets\"]\n\tpath = " + modulePath + "\n\turl = " + location + "\n"
+	if err := os.WriteFile(filepath.Join(repoPath, ".gitmodules"), []byte(modules), 0o644); err != nil {
+		return err
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		return err
+	}
+	if _, err := wt.Add(".gitmodules"); err != nil {
+		return err
+	}
+
+	idx, err := repo.Storer.Index()
+	if err != nil {
+		return err
+	}
+	idx.Entries = append(idx.Entries, &index.Entry{
+		Name: modulePath,
+		Hash: head.Hash(),
+		Mode: filemode.Submodule,
+	})
+	if err := repo.Storer.SetIndex(idx); err != nil {
+		return err
+	}
+
+	_, err = wt.Commit("add submodule", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test",
+			Email: "test@example.com",
+			When:  time.Unix(60, 0),
+		},
+	})
+	return err
 }

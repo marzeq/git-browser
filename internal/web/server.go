@@ -43,9 +43,11 @@ type breadcrumb struct {
 }
 
 type treeEntryView struct {
-	Name  string
-	URL   string
-	IsDir bool
+	Name        string
+	URL         string
+	Location    string
+	IsDir       bool
+	IsSubmodule bool
 }
 
 type branchView struct {
@@ -182,6 +184,9 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if redirectToCanonicalRepoURL(w, r, repoName) {
+		return
+	}
 
 	if rest == "" || rest == "/" {
 		s.repoHome(w, r, repoName)
@@ -203,6 +208,25 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func redirectToCanonicalRepoURL(w http.ResponseWriter, r *http.Request, repoName string) bool {
+	canonicalRepoPath := "/" + displayRepoName(repoName)
+	if r.URL.Path == canonicalRepoPath || strings.HasPrefix(r.URL.Path, canonicalRepoPath+"/") {
+		return false
+	}
+	dotGitRepoPath := canonicalRepoPath + ".git"
+	if r.URL.Path != dotGitRepoPath && !strings.HasPrefix(r.URL.Path, dotGitRepoPath+"/") {
+		return false
+	}
+	suffix := strings.TrimPrefix(r.URL.Path, dotGitRepoPath)
+
+	target := (&url.URL{
+		Path:     canonicalRepoPath + suffix,
+		RawQuery: r.URL.RawQuery,
+	}).String()
+	http.Redirect(w, r, target, http.StatusPermanentRedirect)
+	return true
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
@@ -284,6 +308,11 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 	}
 
 	entries := repo.TreeEntries(tree, treePath)
+	submoduleLocations, err := repo.SubmoduleLocations(rev.Commit)
+	if err != nil {
+		s.writeError(w, r, http.StatusInternalServerError, err)
+		return
+	}
 	readme, err := repo.Readme(tree)
 	if err != nil {
 		s.writeError(w, r, http.StatusInternalServerError, err)
@@ -292,6 +321,14 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 
 	entryViews := make([]treeEntryView, 0, len(entries))
 	for _, entry := range entries {
+		if entry.IsSubmodule {
+			entryViews = append(entryViews, treeEntryView{
+				Name:        entry.Name,
+				Location:    submoduleLocations[entry.Path],
+				IsSubmodule: true,
+			})
+			continue
+		}
 		target := "blob"
 		if entry.IsDir {
 			target = "tree"
@@ -678,7 +715,7 @@ func branchesURL(repoName, revision string) string {
 }
 
 func homeURL(repoName string) string {
-	return "/" + escapeSlashed(repoName)
+	return "/" + escapeSlashed(displayRepoName(repoName))
 }
 
 func objectURL(repoName, section, revision, objectPath string) string {

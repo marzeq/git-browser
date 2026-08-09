@@ -69,6 +69,42 @@ func TestDiscoverListsNestedRepositoriesOneLevelDeep(t *testing.T) {
 	}
 }
 
+func TestStoreSplitPathAcceptsRepoNamesWithOrWithoutDotGit(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "bare-name.git"); err != nil {
+		t.Fatal(err)
+	}
+	if err := initRepo(root, "plain-name"); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path     string
+		wantRepo string
+		wantRest string
+	}{
+		{path: "/bare-name/tree/main", wantRepo: "bare-name.git", wantRest: "/tree/main"},
+		{path: "/bare-name.git/tree/main", wantRepo: "bare-name.git", wantRest: "/tree/main"},
+		{path: "/plain-name/tree/main", wantRepo: "plain-name", wantRest: "/tree/main"},
+		{path: "/plain-name.git/tree/main", wantRepo: "plain-name", wantRest: "/tree/main"},
+	}
+
+	for _, tc := range tests {
+		repoName, rest, ok := store.SplitPath(tc.path)
+		if !ok {
+			t.Fatalf("%s: repository was not resolved", tc.path)
+		}
+		if repoName != tc.wantRepo || rest != tc.wantRest {
+			t.Fatalf("%s: got (%q, %q), want (%q, %q)", tc.path, repoName, rest, tc.wantRepo, tc.wantRest)
+		}
+	}
+}
+
 func TestDiscoverSkipsHiddenRepositories(t *testing.T) {
 	root := t.TempDir()
 	if err := initRepo(root, "alpha"); err != nil {

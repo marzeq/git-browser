@@ -7,8 +7,8 @@
   <tbody>
     {{range .Entries}}
     <tr>
-      <td class="entry-kind">{{if .IsDir}}dir{{else}}file{{end}}</td>
-      <td><a href="{{.URL}}">{{.Name}}{{if .IsDir}}/{{end}}</a></td>
+      <td class="entry-kind">{{if .IsSubmodule}}submodule{{else if .IsDir}}dir{{else}}file{{end}}</td>
+      <td>{{if .IsSubmodule}}{{.Name}}{{if .Location}} <span class="meta">&rarr; {{.Location}}</span>{{end}}{{else}}<a href="{{.URL}}">{{.Name}}{{if .IsDir}}/{{end}}</a>{{end}}</td>
     </tr>
     {{else}}
     <tr><td colspan="2">Empty tree.</td></tr>

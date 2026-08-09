@@ -108,16 +108,39 @@ func (s *Store) SplitPath(raw string) (string, string, bool) {
 
 	for i := len(parts); i >= 1; i-- {
 		candidate := strings.Join(parts[:i], "/")
-		if _, ok := s.repos[candidate]; !ok {
+		repoName, ok := resolveRepoName(s.repos, candidate)
+		if !ok {
 			continue
 		}
 		if i == len(parts) {
-			return candidate, "", true
+			return repoName, "", true
 		}
-		return candidate, "/" + strings.Join(parts[i:], "/"), true
+		return repoName, "/" + strings.Join(parts[i:], "/"), true
 	}
 
 	return "", "", false
+}
+
+func resolveRepoName(repos map[string]Info, candidate string) (string, bool) {
+	if _, ok := repos[candidate]; ok {
+		return candidate, true
+	}
+
+	if strings.HasSuffix(candidate, ".git") {
+		withoutSuffix := strings.TrimSuffix(candidate, ".git")
+		if withoutSuffix != "" {
+			if _, ok := repos[withoutSuffix]; ok {
+				return withoutSuffix, true
+			}
+		}
+		return "", false
+	}
+
+	withSuffix := candidate + ".git"
+	if _, ok := repos[withSuffix]; ok {
+		return withSuffix, true
+	}
+	return "", false
 }
 
 func (s *Store) Refresh() error {

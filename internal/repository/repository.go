@@ -9,6 +9,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/go-git/go-git/v5"
+	gitconfig "github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/filemode"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -40,10 +41,11 @@ type ResolvedRevision struct {
 }
 
 type TreeEntry struct {
-	Name  string
-	Path  string
-	IsDir bool
-	Mode  filemode.FileMode
+	Name        string
+	Path        string
+	IsDir       bool
+	IsSubmodule bool
+	Mode        filemode.FileMode
 }
 
 type Readme struct {
@@ -148,10 +150,11 @@ func (r *Repository) TreeEntries(tree *object.Tree, treePath string) []TreeEntry
 	for _, entry := range tree.Entries {
 		entryPath := joinGitPath(treePath, entry.Name)
 		entries = append(entries, TreeEntry{
-			Name:  entry.Name,
-			Path:  entryPath,
-			IsDir: entry.Mode == filemode.Dir,
-			Mode:  entry.Mode,
+			Name:        entry.Name,
+			Path:        entryPath,
+			IsDir:       entry.Mode == filemode.Dir,
+			IsSubmodule: entry.Mode == filemode.Submodule,
+			Mode:        entry.Mode,
 		})
 	}
 
@@ -163,6 +166,40 @@ func (r *Repository) TreeEntries(tree *object.Tree, treePath string) []TreeEntry
 	})
 
 	return entries
+}
+
+// SubmoduleLocations returns the configured clone location for each submodule
+// path at the given commit. Reading .gitmodules from the commit keeps historic
+// tree pages independent of the repository's current worktree state.
+func (r *Repository) SubmoduleLocations(commit *object.Commit) (map[string]string, error) {
+	locations := make(map[string]string)
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, err
+	}
+
+	file, err := tree.File(".gitmodules")
+	if err != nil {
+		if errors.Is(err, object.ErrFileNotFound) {
+			return locations, nil
+		}
+		return nil, err
+	}
+
+	content, err := readAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	modules := gitconfig.NewModules()
+	if err := modules.Unmarshal(content); err != nil {
+		return nil, err
+	}
+	for _, module := range modules.Submodules {
+		locations[module.Path] = module.URL
+	}
+
+	return locations, nil
 }
 
 func (r *Repository) Readme(tree *object.Tree) (*Readme, error) {

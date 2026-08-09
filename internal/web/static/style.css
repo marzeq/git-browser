@@ -94,6 +94,7 @@ textarea {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
+  margin-left: auto;
 }
 
 .copy-link {
@@ -192,12 +193,14 @@ pre {
   }
 
   .clone-line {
-    margin-left: 0;
+    margin-left: auto;
+    text-align: right;
     white-space: normal;
   }
 
   .clone-lines {
-    align-items: flex-start;
+    align-items: flex-end;
+    width: 100%;
   }
 
   .listing,
