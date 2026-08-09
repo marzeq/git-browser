@@ -9,5 +9,7 @@ import (
 var assets embed.FS
 
 func parseTemplates() (*template.Template, error) {
-	return template.ParseFS(assets, "templates/*.html")
+	return template.New("").Funcs(template.FuncMap{
+		"markdown": renderMarkdown,
+	}).ParseFS(assets, "templates/*.html")
 }

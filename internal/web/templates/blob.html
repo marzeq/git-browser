@@ -5,5 +5,5 @@
   <a href="{{.RawURL}}">raw</a>
 </nav>
 
-<pre>{{.Content}}</pre>
+<pre{{if .IsMarkdown}} class="markdown-preview"{{end}}>{{if .IsMarkdown}}{{markdown .Content}}{{else}}{{.Content}}{{end}}</pre>
 {{template "copy-script" .}}{{template "page-end" .}}{{end}}

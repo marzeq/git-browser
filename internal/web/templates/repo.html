@@ -19,7 +19,7 @@
 {{if .Readme}}
 <section class="readme">
   <h2>{{.ReadmeName}}</h2>
-  <pre>{{.Readme}}</pre>
+  <pre{{if .ReadmeIsMD}} class="markdown-preview"{{end}}>{{if .ReadmeIsMD}}{{markdown .Readme}}{{else}}{{.Readme}}{{end}}</pre>
 </section>
 {{end}}
 {{end}}

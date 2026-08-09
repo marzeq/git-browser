@@ -182,6 +182,46 @@ pre {
   word-break: break-word;
 }
 
+.markdown-preview .md-heading {
+  font-weight: 700;
+}
+
+.markdown-preview .md-h1 {
+  font-size: 1.6em;
+}
+
+.markdown-preview .md-h2 {
+  font-size: 1.45em;
+}
+
+.markdown-preview .md-h3 {
+  font-size: 1.3em;
+}
+
+.markdown-preview .md-h4 {
+  font-size: 1.2em;
+}
+
+.markdown-preview .md-h5 {
+  font-size: 1.1em;
+}
+
+.markdown-preview .md-h6 {
+  font-size: 1.05em;
+}
+
+.markdown-preview .md-bold {
+  font-weight: 700;
+}
+
+.markdown-preview .md-italic {
+  font-style: italic;
+}
+
+.markdown-preview .md-underline {
+  text-decoration: underline;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 1rem;

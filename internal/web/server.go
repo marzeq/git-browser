@@ -94,6 +94,7 @@ type repoData struct {
 	Entries       []treeEntryView
 	ReadmeName    string
 	Readme        string
+	ReadmeIsMD    bool
 }
 
 type blobData struct {
@@ -114,6 +115,7 @@ type blobData struct {
 	RawURL        string
 	Content       string
 	ContentType   string
+	IsMarkdown    bool
 }
 
 type logData struct {
@@ -357,6 +359,7 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 	if readme != nil {
 		data.ReadmeName = readme.Name
 		data.Readme = readme.Content
+		data.ReadmeIsMD = isMarkdownFile(readme.Name)
 	}
 	if treePath != "" {
 		data.Breadcrumbs = breadcrumbs(repo.Name(), rev.Name, treePath)
@@ -425,6 +428,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		RawURL:        rawObjectURL(repo.Name(), "blob", rev.Name, filePath),
 		Content:       string(blob.Content),
 		ContentType:   blob.ContentType,
+		IsMarkdown:    isMarkdownFile(blob.Name),
 	}
 	data.Breadcrumbs = blobBreadcrumbs(repo.Name(), rev.Name, filePath)
 
@@ -791,6 +795,10 @@ func displayRepoName(name string) string {
 		return strings.TrimSuffix(name, ".git")
 	}
 	return name
+}
+
+func isMarkdownFile(name string) bool {
+	return strings.EqualFold(path.Ext(name), ".md")
 }
 
 func displayRevision(rev *repository.ResolvedRevision) string {
