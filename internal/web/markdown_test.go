@@ -5,49 +5,71 @@ import (
 	"testing"
 )
 
-func TestRenderMarkdownUsesSpanFormatting(t *testing.T) {
-	source := "# Heading <unsafe>\nText with **bold**, _italic_, and ++underlined++."
-	rendered := string(renderMarkdown(source))
+func TestRenderMarkdownSupportsGFM(t *testing.T) {
+	source := `# Heading
+
+Text with **bold**, _italic_, [a link](https://example.com), and ![an image](image.png).
+
+Inline code: ` + "`**not bold**`" + `
+
+` + "```go\n**also not bold**\n```"
+	renderedHTML, err := renderMarkdown(source, "/demo/blob/main/docs/", "/demo/raw/blob/main/docs/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedHTML)
 
 	for _, want := range []string{
-		`<span class="md-heading md-h1">Heading &lt;unsafe&gt;</span>`,
-		`<span class="md-bold">bold</span>`,
-		`<span class="md-italic">italic</span>`,
-		`<span class="md-underline">underlined</span>`,
+		`<h1 id="heading">Heading</h1>`,
+		`<strong>bold</strong>`,
+		`<em>italic</em>`,
+		`<a href="https://example.com">a link</a>`,
+		`<img src="/demo/raw/blob/main/docs/image.png" alt="an image">`,
+		`<code>**not bold**</code>`,
+		"<pre><code class=\"language-go\">**also not bold**\n</code></pre>",
 	} {
 		if !strings.Contains(rendered, want) {
 			t.Fatalf("rendered Markdown did not contain %q\noutput:\n%s", want, rendered)
 		}
 	}
-	if strings.Contains(rendered, "<h1") || strings.Contains(rendered, "<strong") || strings.Contains(rendered, "<em") {
-		t.Fatalf("rendered Markdown used a non-span formatting element:\n%s", rendered)
+	if strings.Contains(rendered, `<strong>not bold</strong>`) || strings.Contains(rendered, `<strong>also not bold</strong>`) {
+		t.Fatalf("Markdown inside code was parsed:\n%s", rendered)
 	}
 }
 
-func TestRenderMarkdownEscapesHTMLAndLeavesUnsupportedMarkupAlone(t *testing.T) {
-	source := `<script>alert("x")</script> [link](https://example.com) **unfinished`
-	rendered := string(renderMarkdown(source))
+func TestRenderMarkdownUsesSafeRenderer(t *testing.T) {
+	source := `<script>alert("x")</script>
 
-	if strings.Contains(rendered, "<script>") {
-		t.Fatalf("rendered Markdown contained source HTML:\n%s", rendered)
+[unsafe](javascript:alert('x'))
+
+![unsafe](javascript:alert('x'))`
+	renderedHTML, err := renderMarkdown(source, "/demo/blob/main/", "/demo/raw/blob/main/")
+	if err != nil {
+		t.Fatal(err)
 	}
+	rendered := string(renderedHTML)
+
+	if strings.Contains(rendered, "<script>") || strings.Contains(rendered, `href="javascript:`) || strings.Contains(rendered, `src="javascript:`) {
+		t.Fatalf("rendered Markdown contained unsafe HTML:\n%s", rendered)
+	}
+}
+
+func TestRenderMarkdownResolvesRelativeLinksAgainstPreviewDirectory(t *testing.T) {
+	renderedHTML, err := renderMarkdown(
+		`[guide](../guide.md#usage) ![logo](images/logo.png)`,
+		"/demo/blob/main/docs/reference/",
+		"/demo/raw/blob/main/docs/reference/",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedHTML)
 	for _, want := range []string{
-		`&lt;script&gt;alert(&#34;x&#34;)&lt;/script&gt;`,
-		`[link](https://example.com)`,
-		`**unfinished`,
+		`href="/demo/blob/main/docs/guide.md#usage"`,
+		`src="/demo/raw/blob/main/docs/reference/images/logo.png"`,
 	} {
 		if !strings.Contains(rendered, want) {
-			t.Fatalf("rendered Markdown did not preserve %q\noutput:\n%s", want, rendered)
-		}
-	}
-}
-
-func TestMarkdownHeadingSupportsSixLevels(t *testing.T) {
-	for level := 1; level <= 6; level++ {
-		source := strings.Repeat("#", level) + " title"
-		want := `class="md-heading md-h` + string(rune('0'+level)) + `"`
-		if rendered := string(renderMarkdown(source)); !strings.Contains(rendered, want) {
-			t.Fatalf("level %d: output did not contain %q: %s", level, want, rendered)
+			t.Fatalf("rendered Markdown did not contain %q\noutput:\n%s", want, rendered)
 		}
 	}
 }

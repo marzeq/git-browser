@@ -2,6 +2,8 @@ module git-browser
 
 go 1.26.4
 
+require github.com/yuin/goldmark v1.8.2
+
 require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

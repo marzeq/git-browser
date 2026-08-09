@@ -5,6 +5,7 @@
   --muted: #666666;
   --line: #d0d0d0;
   --link: #0044aa;
+  --code-bg: #eeeeee;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -14,6 +15,7 @@
     --muted: #a0a0a0;
     --line: #333333;
     --link: #8ab4ff;
+    --code-bg: #252525;
   }
 }
 
@@ -168,7 +170,7 @@ textarea {
   margin-top: 2rem;
 }
 
-.readme h2 {
+.readme > h2 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
 }
@@ -182,44 +184,47 @@ pre {
   word-break: break-word;
 }
 
-.markdown-preview .md-heading {
+.markdown-preview {
+  padding: 1rem;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+}
+
+.markdown-preview > :first-child {
+  margin-top: 0;
+}
+
+.markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
   font-weight: 700;
+  line-height: 1.25;
 }
 
-.markdown-preview .md-h1 {
-  font-size: 1.6em;
+.markdown-preview img {
+  max-width: 100%;
+  height: auto;
 }
 
-.markdown-preview .md-h2 {
-  font-size: 1.45em;
+.markdown-preview code {
+  padding: 0.15em 0.35em;
+  background: var(--code-bg);
 }
 
-.markdown-preview .md-h3 {
-  font-size: 1.3em;
+.markdown-preview pre {
+  background: var(--code-bg);
 }
 
-.markdown-preview .md-h4 {
-  font-size: 1.2em;
-}
-
-.markdown-preview .md-h5 {
-  font-size: 1.1em;
-}
-
-.markdown-preview .md-h6 {
-  font-size: 1.05em;
-}
-
-.markdown-preview .md-bold {
-  font-weight: 700;
-}
-
-.markdown-preview .md-italic {
-  font-style: italic;
-}
-
-.markdown-preview .md-underline {
-  text-decoration: underline;
+.markdown-preview pre code {
+  padding: 0;
+  background: transparent;
 }
 
 @media (max-width: 720px) {

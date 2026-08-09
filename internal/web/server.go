@@ -81,41 +81,45 @@ type repoLink struct {
 
 type repoData struct {
 	pageData
-	RepoName      string
-	HomeURL       string
-	CloneURLs     []cloneLink
-	Revision      string
-	RevisionLabel string
-	Empty         bool
-	TreeURL       string
-	LogURL        string
-	BranchesURL   string
-	Breadcrumbs   []breadcrumb
-	Entries       []treeEntryView
-	ReadmeName    string
-	Readme        string
-	ReadmeIsMD    bool
+	RepoName             string
+	HomeURL              string
+	CloneURLs            []cloneLink
+	Revision             string
+	RevisionLabel        string
+	Empty                bool
+	TreeURL              string
+	LogURL               string
+	BranchesURL          string
+	Breadcrumbs          []breadcrumb
+	Entries              []treeEntryView
+	ReadmeName           string
+	Readme               string
+	ReadmeIsMD           bool
+	MarkdownBaseURL      string
+	MarkdownImageBaseURL string
 }
 
 type blobData struct {
 	pageData
-	RepoName      string
-	HomeURL       string
-	CloneURLs     []cloneLink
-	Revision      string
-	RevisionLabel string
-	Empty         bool
-	TreeURL       string
-	LogURL        string
-	BranchesURL   string
-	Breadcrumbs   []breadcrumb
-	FilePath      string
-	DirectoryURL  string
-	HistoryURL    string
-	RawURL        string
-	Content       string
-	ContentType   string
-	IsMarkdown    bool
+	RepoName             string
+	HomeURL              string
+	CloneURLs            []cloneLink
+	Revision             string
+	RevisionLabel        string
+	Empty                bool
+	TreeURL              string
+	LogURL               string
+	BranchesURL          string
+	Breadcrumbs          []breadcrumb
+	FilePath             string
+	DirectoryURL         string
+	HistoryURL           string
+	RawURL               string
+	Content              string
+	ContentType          string
+	IsMarkdown           bool
+	MarkdownBaseURL      string
+	MarkdownImageBaseURL string
 }
 
 type logData struct {
@@ -344,16 +348,18 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 
 	displayName := displayRepoName(repo.Name())
 	data := repoData{
-		pageData:      pageData{Title: displayName},
-		RepoName:      displayName,
-		HomeURL:       homeURL(repo.Name()),
-		CloneURLs:     s.cloneURLs(repo.Name()),
-		Revision:      rev.Name,
-		RevisionLabel: displayRevision(rev),
-		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, treePath),
-		LogURL:        repoURL(repo.Name(), "log", rev.Name),
-		BranchesURL:   branchesURL(repo.Name(), rev.Name),
-		Entries:       entryViews,
+		pageData:             pageData{Title: displayName},
+		RepoName:             displayName,
+		HomeURL:              homeURL(repo.Name()),
+		CloneURLs:            s.cloneURLs(repo.Name()),
+		Revision:             rev.Name,
+		RevisionLabel:        displayRevision(rev),
+		TreeURL:              objectURL(repo.Name(), "tree", rev.Name, treePath),
+		LogURL:               repoURL(repo.Name(), "log", rev.Name),
+		BranchesURL:          branchesURL(repo.Name(), rev.Name),
+		Entries:              entryViews,
+		MarkdownBaseURL:      objectURL(repo.Name(), "blob", rev.Name, treePath) + "/",
+		MarkdownImageBaseURL: rawObjectURL(repo.Name(), "blob", rev.Name, treePath) + "/",
 	}
 
 	if readme != nil {
@@ -413,22 +419,24 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 
 	displayName := displayRepoName(repo.Name())
 	data := blobData{
-		pageData:      pageData{Title: blob.Name},
-		RepoName:      displayName,
-		HomeURL:       homeURL(repo.Name()),
-		CloneURLs:     s.cloneURLs(repo.Name()),
-		Revision:      rev.Name,
-		RevisionLabel: displayRevision(rev),
-		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, dirPath),
-		LogURL:        repoURL(repo.Name(), "log", rev.Name),
-		BranchesURL:   branchesURL(repo.Name(), rev.Name),
-		FilePath:      filePath,
-		DirectoryURL:  objectURL(repo.Name(), "tree", rev.Name, dirPath),
-		HistoryURL:    logURL(repo.Name(), rev.Name, filePath, 0),
-		RawURL:        rawObjectURL(repo.Name(), "blob", rev.Name, filePath),
-		Content:       string(blob.Content),
-		ContentType:   blob.ContentType,
-		IsMarkdown:    isMarkdownFile(blob.Name),
+		pageData:             pageData{Title: blob.Name},
+		RepoName:             displayName,
+		HomeURL:              homeURL(repo.Name()),
+		CloneURLs:            s.cloneURLs(repo.Name()),
+		Revision:             rev.Name,
+		RevisionLabel:        displayRevision(rev),
+		TreeURL:              objectURL(repo.Name(), "tree", rev.Name, dirPath),
+		LogURL:               repoURL(repo.Name(), "log", rev.Name),
+		BranchesURL:          branchesURL(repo.Name(), rev.Name),
+		FilePath:             filePath,
+		DirectoryURL:         objectURL(repo.Name(), "tree", rev.Name, dirPath),
+		HistoryURL:           logURL(repo.Name(), rev.Name, filePath, 0),
+		RawURL:               rawObjectURL(repo.Name(), "blob", rev.Name, filePath),
+		Content:              string(blob.Content),
+		ContentType:          blob.ContentType,
+		IsMarkdown:           isMarkdownFile(blob.Name),
+		MarkdownBaseURL:      objectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
+		MarkdownImageBaseURL: rawObjectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
 	}
 	data.Breadcrumbs = blobBreadcrumbs(repo.Name(), rev.Name, filePath)
 
