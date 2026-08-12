@@ -63,6 +63,7 @@ func TestServerRendersCorePages(t *testing.T) {
 		{path: "/demo/branches", want: "feature"},
 		{path: "/demo/tree/feature/", want: "README.md"},
 		{path: "/demo/tree/feature/", want: "/demo/branches?rev=feature"},
+		{path: "/demo/tree/" + rev.Hash.String() + "/", want: `<div class="markdown-preview"><p>hello</p>`},
 	}
 
 	for _, tc := range tests {
@@ -441,6 +442,7 @@ func TestServerSupportsNestedRepositoryPaths(t *testing.T) {
 		{path: "/", want: "href=\"/acme/demo\""},
 		{path: "/acme/demo", want: "git@localhost:repos/acme/demo.git"},
 		{path: "/acme/demo/tree/" + rev.Name + "/", want: "README.md"},
+		{path: "/acme/demo/tree/" + rev.Hash.String() + "/", want: `<div class="markdown-preview"><p>hello</p>`},
 		{path: "/acme/demo/raw/blob/" + rev.Name + "/README.md", want: "hello\n"},
 	}
 
