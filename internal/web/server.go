@@ -57,6 +57,12 @@ type branchView struct {
 	Current bool
 }
 
+type tagView struct {
+	Name string
+	URL  string
+	Hash string
+}
+
 type commitView struct {
 	Hash    string
 	URL     string
@@ -90,6 +96,7 @@ type repoData struct {
 	TreeURL              string
 	LogURL               string
 	BranchesURL          string
+	TagsURL              string
 	Breadcrumbs          []breadcrumb
 	Entries              []treeEntryView
 	ReadmeName           string
@@ -110,6 +117,7 @@ type blobData struct {
 	TreeURL              string
 	LogURL               string
 	BranchesURL          string
+	TagsURL              string
 	Breadcrumbs          []breadcrumb
 	FilePath             string
 	DirectoryURL         string
@@ -133,6 +141,7 @@ type logData struct {
 	TreeURL       string
 	LogURL        string
 	BranchesURL   string
+	TagsURL       string
 	Path          string
 	BackURL       string
 	Commits       []commitView
@@ -152,7 +161,23 @@ type branchesData struct {
 	TreeURL       string
 	LogURL        string
 	BranchesURL   string
+	TagsURL       string
 	Branches      []branchView
+}
+
+type tagsData struct {
+	pageData
+	RepoName      string
+	HomeURL       string
+	CloneURLs     []cloneLink
+	Revision      string
+	RevisionLabel string
+	Empty         bool
+	TreeURL       string
+	LogURL        string
+	BranchesURL   string
+	TagsURL       string
+	Tags          []tagView
 }
 
 func NewServer(store *repository.Store, config Config) (*Server, error) {
@@ -211,6 +236,8 @@ func (s *Server) route(w http.ResponseWriter, r *http.Request) {
 		s.log(w, r, repoName, tail)
 	case "branches":
 		s.branches(w, r, repoName)
+	case "tags":
+		s.tags(w, r, repoName)
 	default:
 		http.NotFound(w, r)
 	}
@@ -281,6 +308,7 @@ func (s *Server) renderEmptyRepoPage(w http.ResponseWriter, r *http.Request, rep
 		CloneURLs:   s.cloneURLs(repo.Name()),
 		Empty:       true,
 		BranchesURL: branchesURL(repo.Name(), ""),
+		TagsURL:     tagsURL(repo.Name(), ""),
 	}
 
 	s.render(w, "repo.html", data)
@@ -357,6 +385,7 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 		TreeURL:              objectURL(repo.Name(), "tree", rev.Name, treePath),
 		LogURL:               repoURL(repo.Name(), "log", rev.Name),
 		BranchesURL:          branchesURL(repo.Name(), rev.Name),
+		TagsURL:              tagsURL(repo.Name(), rev.Name),
 		Entries:              entryViews,
 		MarkdownBaseURL:      objectURL(repo.Name(), "blob", rev.Name, treePath) + "/",
 		MarkdownImageBaseURL: rawObjectURL(repo.Name(), "blob", rev.Name, treePath) + "/",
@@ -428,6 +457,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		TreeURL:              objectURL(repo.Name(), "tree", rev.Name, dirPath),
 		LogURL:               repoURL(repo.Name(), "log", rev.Name),
 		BranchesURL:          branchesURL(repo.Name(), rev.Name),
+		TagsURL:              tagsURL(repo.Name(), rev.Name),
 		FilePath:             filePath,
 		DirectoryURL:         objectURL(repo.Name(), "tree", rev.Name, dirPath),
 		HistoryURL:           logURL(repo.Name(), rev.Name, filePath, 0),
@@ -516,6 +546,7 @@ func (s *Server) log(w http.ResponseWriter, r *http.Request, repoName, tail stri
 		TreeURL:       objectURL(repo.Name(), "tree", rev.Name, ""),
 		LogURL:        repoURL(repo.Name(), "log", rev.Name),
 		BranchesURL:   branchesURL(repo.Name(), rev.Name),
+		TagsURL:       tagsURL(repo.Name(), rev.Name),
 		Path:          filePath,
 		Commits:       items,
 		Page:          page,
@@ -586,6 +617,7 @@ func (s *Server) branches(w http.ResponseWriter, r *http.Request, repoName strin
 		CloneURLs:   s.cloneURLs(repo.Name()),
 		Empty:       rev == nil,
 		BranchesURL: branchesURL(repo.Name(), selectedRevision),
+		TagsURL:     tagsURL(repo.Name(), selectedRevision),
 		Branches:    items,
 	}
 	if rev != nil {
@@ -594,9 +626,55 @@ func (s *Server) branches(w http.ResponseWriter, r *http.Request, repoName strin
 		data.TreeURL = objectURL(repo.Name(), "tree", rev.Name, "")
 		data.LogURL = repoURL(repo.Name(), "log", rev.Name)
 		data.BranchesURL = branchesURL(repo.Name(), rev.Name)
+		data.TagsURL = tagsURL(repo.Name(), rev.Name)
 	}
 
 	s.render(w, "branches.html", data)
+}
+
+func (s *Server) tags(w http.ResponseWriter, r *http.Request, repoName string) {
+	repo, err := s.store.Open(repoName)
+	if err != nil {
+		s.writeRepoError(w, r, err)
+		return
+	}
+
+	selectedRevision := strings.TrimSpace(r.URL.Query().Get("rev"))
+	var rev *repository.ResolvedRevision
+	if selectedRevision != "" {
+		rev, err = repo.ResolveRevision(selectedRevision)
+	} else {
+		rev, err = repo.DefaultRevision()
+	}
+	if err != nil && !errors.Is(err, repository.ErrEmptyRepository) {
+		s.writeError(w, r, http.StatusNotFound, err)
+		return
+	}
+
+	tags, err := repo.Tags()
+	if err != nil {
+		s.writeError(w, r, http.StatusInternalServerError, err)
+		return
+	}
+	items := make([]tagView, 0, len(tags))
+	for _, tag := range tags {
+		items = append(items, tagView{Name: tag.Name, URL: objectURL(repo.Name(), "tree", tag.Name, ""), Hash: shortHash(tag.Hash.String())})
+	}
+
+	displayName := displayRepoName(repo.Name())
+	data := tagsData{
+		pageData: pageData{Title: fmt.Sprintf("%s tags", displayName)}, RepoName: displayName,
+		HomeURL: homeURL(repo.Name()), CloneURLs: s.cloneURLs(repo.Name()), Empty: rev == nil,
+		BranchesURL: branchesURL(repo.Name(), selectedRevision), TagsURL: tagsURL(repo.Name(), selectedRevision), Tags: items,
+	}
+	if rev != nil {
+		data.Revision, data.RevisionLabel = rev.Name, displayRevision(rev)
+		data.TreeURL = objectURL(repo.Name(), "tree", rev.Name, "")
+		data.LogURL = repoURL(repo.Name(), "log", rev.Name)
+		data.BranchesURL = branchesURL(repo.Name(), rev.Name)
+		data.TagsURL = tagsURL(repo.Name(), rev.Name)
+	}
+	s.render(w, "tags.html", data)
 }
 
 func (s *Server) serveStyle(w http.ResponseWriter, r *http.Request) {
@@ -720,6 +798,14 @@ func repoSectionURL(repoName, section string) string {
 
 func branchesURL(repoName, revision string) string {
 	base := repoSectionURL(repoName, "branches")
+	if revision == "" {
+		return base
+	}
+	return base + "?rev=" + url.QueryEscape(revision)
+}
+
+func tagsURL(repoName, revision string) string {
+	base := repoSectionURL(repoName, "tags")
 	if revision == "" {
 		return base
 	}

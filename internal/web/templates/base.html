@@ -48,12 +48,14 @@
   <p class="meta">empty repository</p>
   <nav class="nav-links">
     <a href="{{.BranchesURL}}">branches</a>
+    <a href="{{.TagsURL}}">tags</a>
   </nav>
   {{else}}
   <nav class="nav-links">
     <a href="{{.TreeURL}}">tree</a>
     <a href="{{.LogURL}}">log</a>
     <a href="{{.BranchesURL}}">branches</a>
+    <a href="{{.TagsURL}}">tags</a>
   </nav>
   {{end}}
 </header>

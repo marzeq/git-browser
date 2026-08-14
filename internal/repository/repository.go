@@ -72,6 +72,11 @@ type Branch struct {
 	Current bool
 }
 
+type Tag struct {
+	Name string
+	Hash plumbing.Hash
+}
+
 func Open(name, path string) (*Repository, error) {
 	repo, err := git.PlainOpen(path)
 	if err != nil {
@@ -338,6 +343,35 @@ func (r *Repository) Branches() ([]Branch, error) {
 	})
 
 	return branches, nil
+}
+
+func (r *Repository) Tags() ([]Tag, error) {
+	iter, err := r.repo.Tags()
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	var tags []Tag
+	err = iter.ForEach(func(ref *plumbing.Reference) error {
+		hash, err := r.repo.ResolveRevision(plumbing.Revision(ref.Name().String()))
+		if err != nil {
+			return err
+		}
+		if _, err := r.repo.CommitObject(*hash); err != nil {
+			return err
+		}
+		tags = append(tags, Tag{Name: ref.Name().Short(), Hash: *hash})
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Slice(tags, func(i, j int) bool {
+		return strings.ToLower(tags[i].Name) < strings.ToLower(tags[j].Name)
+	})
+	return tags, nil
 }
 
 func shortReferenceName(ref *plumbing.Reference) string {

@@ -61,6 +61,11 @@ func TestServerRendersCorePages(t *testing.T) {
 		{path: "/demo/log/" + rev.Name, want: "/demo/tree/"},
 		{path: "/demo/log/" + rev.Name + "?path=README.md", want: "back to file"},
 		{path: "/demo/branches", want: "feature"},
+		{path: "/demo/tags", want: "v1.0.0"},
+		{path: "/demo/tags", want: "release"},
+		{path: "/demo/tree/v1.0.0/", want: "README.md"},
+		{path: "/demo/tree/v1.0.0/", want: "/demo/tags?rev=v1.0.0"},
+		{path: "/demo/tree/release/", want: "README.md"},
 		{path: "/demo/tree/feature/", want: "README.md"},
 		{path: "/demo/tree/feature/", want: "/demo/branches?rev=feature"},
 		{path: "/demo/tree/" + rev.Hash.String() + "/", want: `<div class="markdown-preview"><p>hello</p>`},
@@ -520,8 +525,17 @@ func initRepo(root, name string) error {
 	if err := repo.CreateBranch(&config.Branch{Name: "feature"}); err != nil {
 		return err
 	}
-
-	return repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("feature"), hash))
+	if err := repo.Storer.SetReference(plumbing.NewHashReference(plumbing.NewBranchReferenceName("feature"), hash)); err != nil {
+		return err
+	}
+	if _, err := repo.CreateTag("v1.0.0", hash, nil); err != nil {
+		return err
+	}
+	_, err = repo.CreateTag("release", hash, &git.CreateTagOptions{
+		Tagger:  &object.Signature{Name: "Test", Email: "test@example.com", When: time.Unix(1, 0)},
+		Message: "release tag",
+	})
+	return err
 }
 
 func addSubmodule(repoPath, modulePath, location string) error {

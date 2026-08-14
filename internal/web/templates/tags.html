@@ -1,0 +1,21 @@
+{{define "tags.html"}}{{template "page-start" .}}{{template "repo-header" .}}
+
+<table class="listing">
+  <thead>
+    <tr>
+      <th>tag</th>
+      <th>commit</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Tags}}
+    <tr>
+      <td><a href="{{.URL}}">{{.Name}}</a></td>
+      <td>{{.Hash}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="2">No tags found.</td></tr>
+    {{end}}
+  </tbody>
+</table>
+{{template "copy-script" .}}{{template "page-end" .}}{{end}}

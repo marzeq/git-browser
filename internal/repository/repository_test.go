@@ -205,6 +205,50 @@ func TestResolveRevisionAndReadme(t *testing.T) {
 	}
 }
 
+func TestTagsListsLightweightAndAnnotatedTagsByCommit(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+	gitRepo, err := git.PlainOpen(filepath.Join(root, "demo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	head, err := gitRepo.Head()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitRepo.CreateTag("v1.0.0", head.Hash(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := gitRepo.CreateTag("release", head.Hash(), &git.CreateTagOptions{
+		Tagger: &object.Signature{Name: "Test", Email: "test@example.com", When: time.Unix(1, 0)}, Message: "release",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo, err := store.Open("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags, err := repo.Tags()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 2 || tags[0].Name != "release" || tags[1].Name != "v1.0.0" {
+		t.Fatalf("unexpected tags: %#v", tags)
+	}
+	for _, tag := range tags {
+		if tag.Hash != head.Hash() {
+			t.Fatalf("tag %q points to %s, want commit %s", tag.Name, tag.Hash, head.Hash())
+		}
+	}
+}
+
 func TestDefaultRevisionReturnsEmptyRepositoryError(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "empty")
