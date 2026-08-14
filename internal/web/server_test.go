@@ -251,6 +251,71 @@ func TestServerServesRawBlob(t *testing.T) {
 	}
 }
 
+func TestServerPreviewsMediaAndDescribesOtherBinaryBlobs(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+	repoPath := filepath.Join(root, "demo")
+	gitRepo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := gitRepo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string][]byte{
+		"picture.png":  {'\x89', 'P', 'N', 'G', '\r', '\n', '\x1a', '\n'},
+		"sound.mp3":    {'I', 'D', '3', 4, 0, 0, 0, 0, 0, 0},
+		"movie.mp4":    {0, 0, 0, 20, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 0, 0, 'i', 's', 'o', 'm'},
+		"archive.data": {0, 1, 2, 3, 0xff},
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(repoPath, name), content, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Add(name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := wt.Commit("add media", &git.CommitOptions{Author: &object.Signature{
+		Name: "Test", Email: "test@example.com", When: time.Unix(2, 0),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+
+	store, err := repository.Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server, err := NewServer(store, Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "/demo/blob/master/picture.png", want: `<img src="/demo/raw/blob/master/picture.png"`},
+		{path: "/demo/blob/master/sound.mp3", want: `<audio controls preload="metadata" src="/demo/raw/blob/master/sound.mp3"`},
+		{path: "/demo/blob/master/movie.mp4", want: `<video controls preload="metadata" src="/demo/raw/blob/master/movie.mp4"`},
+		{path: "/demo/blob/master/archive.data", want: "This binary file cannot be previewed."},
+		{path: "/demo/blob/master/archive.data", want: "5 bytes"},
+	}
+	for _, tc := range tests {
+		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+		rec := httptest.NewRecorder()
+		server.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("%s: got status %d, want %d", tc.path, rec.Code, http.StatusOK)
+		}
+		if !strings.Contains(rec.Body.String(), tc.want) {
+			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
+		}
+	}
+}
+
 func TestServerRendersEmptyRepositoryPage(t *testing.T) {
 	root := t.TempDir()
 	if _, err := git.PlainInit(filepath.Join(root, "empty"), false); err != nil {

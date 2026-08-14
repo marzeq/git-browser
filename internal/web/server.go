@@ -125,6 +125,11 @@ type blobData struct {
 	RawURL               string
 	Content              string
 	ContentType          string
+	Size                 int
+	IsText               bool
+	IsImage              bool
+	IsAudio              bool
+	IsVideo              bool
 	IsMarkdown           bool
 	MarkdownBaseURL      string
 	MarkdownImageBaseURL string
@@ -436,7 +441,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		return
 	}
 
-	if forceRaw || r.URL.Query().Get("raw") != "" || !blob.Text {
+	if forceRaw || r.URL.Query().Get("raw") != "" {
 		s.serveRawBlob(w, r, blob)
 		return
 	}
@@ -464,7 +469,12 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		RawURL:               rawObjectURL(repo.Name(), "blob", rev.Name, filePath),
 		Content:              string(blob.Content),
 		ContentType:          blob.ContentType,
-		IsMarkdown:           isMarkdownFile(blob.Name),
+		Size:                 len(blob.Content),
+		IsText:               blob.Text,
+		IsImage:              strings.HasPrefix(blob.ContentType, "image/"),
+		IsAudio:              strings.HasPrefix(blob.ContentType, "audio/"),
+		IsVideo:              strings.HasPrefix(blob.ContentType, "video/"),
+		IsMarkdown:           blob.Text && isMarkdownFile(blob.Name),
 		MarkdownBaseURL:      objectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
 		MarkdownImageBaseURL: rawObjectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
 	}

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"mime"
+	"path"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -247,7 +249,7 @@ func (r *Repository) Blob(commit *object.Commit, filePath string) (*Blob, error)
 		return nil, err
 	}
 
-	contentType := detectContentType(content)
+	contentType := detectContentType(content, file.Name)
 	return &Blob{
 		Name:        file.Name,
 		Path:        filePath,
@@ -408,7 +410,7 @@ func readAll(file *object.File) ([]byte, error) {
 	return io.ReadAll(reader)
 }
 
-func detectContentType(content []byte) string {
+func detectContentType(content []byte, name string) string {
 	if len(content) == 0 {
 		return "text/plain; charset=utf-8"
 	}
@@ -416,7 +418,13 @@ func detectContentType(content []byte) string {
 	if len(sniff) > 512 {
 		sniff = sniff[:512]
 	}
-	return httpDetectContentType(sniff)
+	contentType := httpDetectContentType(sniff)
+	if contentType == "application/octet-stream" {
+		if extensionType := mime.TypeByExtension(path.Ext(name)); extensionType != "" {
+			return extensionType
+		}
+	}
+	return contentType
 }
 
 func isTextContent(content []byte, contentType string) bool {

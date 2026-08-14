@@ -175,6 +175,38 @@ textarea {
   font-size: 1rem;
 }
 
+.media-preview,
+.binary-preview {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+}
+
+.media-preview {
+  text-align: center;
+}
+
+.media-preview img,
+.media-preview video {
+  display: block;
+  max-width: 100%;
+  max-height: 75vh;
+  margin: 0 auto;
+}
+
+.media-preview audio {
+  width: min(100%, 40rem);
+}
+
+.binary-preview p {
+  margin: 0;
+}
+
+.binary-preview p + p {
+  margin-top: 0.4rem;
+}
+
 pre {
   margin: 0;
   padding: 1rem;

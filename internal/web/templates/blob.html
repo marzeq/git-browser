@@ -5,5 +5,20 @@
   <a href="{{.RawURL}}">raw</a>
 </nav>
 
-{{if .IsMarkdown}}<div class="markdown-preview">{{markdown .Content .MarkdownBaseURL .MarkdownImageBaseURL}}</div>{{else}}<pre>{{.Content}}</pre>{{end}}
+{{if .IsImage}}
+<div class="media-preview"><img src="{{.RawURL}}" alt="{{.FilePath}}"></div>
+{{else if .IsAudio}}
+<div class="media-preview"><audio controls preload="metadata" src="{{.RawURL}}">Your browser cannot play this audio file.</audio></div>
+{{else if .IsVideo}}
+<div class="media-preview"><video controls preload="metadata" src="{{.RawURL}}">Your browser cannot play this video file.</video></div>
+{{else if .IsMarkdown}}
+<div class="markdown-preview">{{markdown .Content .MarkdownBaseURL .MarkdownImageBaseURL}}</div>
+{{else if .IsText}}
+<pre>{{.Content}}</pre>
+{{else}}
+<div class="binary-preview">
+  <p>This binary file cannot be previewed.</p>
+  <p class="meta">{{.ContentType}} &middot; {{.Size}} bytes</p>
+</div>
+{{end}}
 {{template "copy-script" .}}{{template "page-end" .}}{{end}}
