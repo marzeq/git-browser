@@ -92,11 +92,27 @@ textarea {
   white-space: nowrap;
 }
 
+.clone-details {
+  margin-left: auto;
+  text-align: right;
+}
+
+.clone-details summary {
+  color: var(--link);
+  cursor: pointer;
+  list-style: none;
+}
+
+.clone-details summary::-webkit-details-marker {
+  display: none;
+}
+
 .clone-lines {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   margin-left: auto;
+  margin-top: 0.5rem;
 }
 
 .copy-link {
@@ -284,6 +300,12 @@ pre {
     margin: 0;
     text-align: left;
     white-space: nowrap;
+  }
+
+  .clone-details {
+    width: 100%;
+    margin-left: 0;
+    text-align: left;
   }
 
   .clone-lines {

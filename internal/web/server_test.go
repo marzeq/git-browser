@@ -154,6 +154,8 @@ func TestServerRendersConfiguredClonePrefixes(t *testing.T) {
 	}
 	body := rec.Body.String()
 	for _, want := range []string{
+		`<details class="clone-details">`,
+		`<summary>clone</summary>`,
 		"ssh://git.example.com/repos/demo",
 		"https://git.example.com/repos/demo",
 		"clone ssh:",
@@ -162,6 +164,9 @@ func TestServerRendersConfiguredClonePrefixes(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("response did not contain %q\nbody:\n%s", want, body)
 		}
+	}
+	if strings.Contains(body, `<details class="clone-details" open`) {
+		t.Fatalf("clone URL disclosure was open by default\nbody:\n%s", body)
 	}
 }
 

@@ -37,11 +37,14 @@
   <div class="title-row">
     <h1>{{if .HomeURL}}<a href="{{.HomeURL}}">{{.RepoName}}</a>{{else}}{{.RepoName}}{{end}}{{if not .Empty}} <span class="meta revision-inline">revision: <strong>{{.RevisionLabel}}</strong></span>{{end}}</h1>
     {{if .CloneURLs}}
-    <div class="clone-lines">
-      {{range .CloneURLs}}
-      <p class="meta clone-line">clone {{.Label}}: <span class="copy-link" data-copy-text="{{.URL}}"><code>{{.URL}}</code></span></p>
-      {{end}}
-    </div>
+    <details class="clone-details">
+      <summary>clone</summary>
+      <div class="clone-lines">
+        {{range .CloneURLs}}
+        <p class="meta clone-line">clone {{.Label}}: <span class="copy-link" data-copy-text="{{.URL}}"><code>{{.URL}}</code></span></p>
+        {{end}}
+      </div>
+    </details>
     {{end}}
   </div>
   {{if .Empty}}
