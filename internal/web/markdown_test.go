@@ -73,3 +73,52 @@ func TestRenderMarkdownResolvesRelativeLinksAgainstPreviewDirectory(t *testing.T
 		}
 	}
 }
+
+func TestRenderMarkdownSupportsInlineAndDisplayMath(t *testing.T) {
+	source := `Euler wrote $e^{i\pi} + 1 = 0$.
+
+$$
+\int_0^1 x^2 \, dx = \frac{1}{3}
+$$`
+	renderedHTML, err := renderMarkdown(source, "/demo/blob/main/", "/demo/raw/blob/main/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedHTML)
+	for _, want := range []string{
+		`<span class="math-inline">e^{i\pi} + 1 = 0</span>`,
+		"<span class=\"math-display\">\n\\int_0^1 x^2 \\, dx = \\frac{1}{3}\n</span>",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered Markdown did not contain %q\noutput:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestRenderMarkdownMathDoesNotConsumeCodeOrCurrency(t *testing.T) {
+	source := "A ticket costs $10 and a meal costs $20. `code $x$`\n\n```tex\n$y$\n```"
+	renderedHTML, err := renderMarkdown(source, "/demo/blob/main/", "/demo/raw/blob/main/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedHTML)
+	if strings.Contains(rendered, `class="math-inline"`) || strings.Contains(rendered, `class="math-display"`) {
+		t.Fatalf("currency or code was parsed as math:\n%s", rendered)
+	}
+	for _, want := range []string{"$10", "$20", "<code>code $x$</code>", "<pre><code class=\"language-tex\">$y$"} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered Markdown did not contain %q\noutput:\n%s", want, rendered)
+		}
+	}
+}
+
+func TestRenderMarkdownLeavesUnclosedMathAsText(t *testing.T) {
+	renderedHTML, err := renderMarkdown(`An unfinished $x + 1 expression.`, "/demo/blob/main/", "/demo/raw/blob/main/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendered := string(renderedHTML)
+	if strings.Contains(rendered, `class="math-inline"`) || !strings.Contains(rendered, `$x + 1`) {
+		t.Fatalf("unclosed math was not preserved as text:\n%s", rendered)
+	}
+}

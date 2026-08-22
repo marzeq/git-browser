@@ -55,6 +55,9 @@ func TestServerRendersCorePages(t *testing.T) {
 		{path: "/demo", want: "revision: <strong>master</strong>"},
 		{path: "/demo", want: "README.md"},
 		{path: "/demo", want: `<div class="markdown-preview"><p>hello</p>`},
+		{path: "/demo", want: `/static/katex/katex.min.css`},
+		{path: "/demo", want: `/static/katex/katex.min.js`},
+		{path: "/demo", want: `/static/math.js`},
 		{path: "/demo/blob/" + rev.Name + "/README.md", want: "aria-label=\"Breadcrumb\""},
 		{path: "/demo/blob/" + rev.Name + "/README.md", want: "/demo/raw/blob/" + rev.Name + "/README.md"},
 		{path: "/demo/blob/" + rev.Name + "/README.md", want: `<div class="markdown-preview"><p>hello</p>`},
@@ -69,6 +72,9 @@ func TestServerRendersCorePages(t *testing.T) {
 		{path: "/demo/tree/feature/", want: "README.md"},
 		{path: "/demo/tree/feature/", want: "/demo/branches?rev=feature"},
 		{path: "/demo/tree/" + rev.Hash.String() + "/", want: `<div class="markdown-preview"><p>hello</p>`},
+		{path: "/static/math.js", want: `trust: false`},
+		{path: "/static/katex/katex.min.css", want: `KaTeX_Main`},
+		{path: "/static/katex/katex.min.js", want: `version:"0.16.22"`},
 	}
 
 	for _, tc := range tests {
@@ -83,6 +89,13 @@ func TestServerRendersCorePages(t *testing.T) {
 		if !strings.Contains(rec.Body.String(), tc.want) {
 			t.Fatalf("%s: response did not contain %q\nbody:\n%s", tc.path, tc.want, rec.Body.String())
 		}
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, req)
+	if strings.Contains(rec.Body.String(), "/static/katex/") || strings.Contains(rec.Body.String(), "/static/math.js") {
+		t.Fatalf("non-Markdown page loaded math assets:\n%s", rec.Body.String())
 	}
 }
 

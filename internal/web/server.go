@@ -72,7 +72,8 @@ type commitView struct {
 }
 
 type pageData struct {
-	Title string
+	Title       string
+	HasMarkdown bool
 }
 
 type indexData struct {
@@ -198,6 +199,8 @@ func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/style.css", s.serveStyle)
 	mux.HandleFunc("/static/copy.js", s.serveCopyScript)
+	mux.HandleFunc("/static/math.js", s.serveMathScript)
+	mux.Handle("/static/katex/", http.FileServerFS(assets))
 	mux.HandleFunc("/", s.route)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.URL.Path, "/static/") {
@@ -400,6 +403,7 @@ func (s *Server) renderTreePage(w http.ResponseWriter, r *http.Request, repo *re
 		data.ReadmeName = readme.Name
 		data.Readme = readme.Content
 		data.ReadmeIsMD = isMarkdownFile(readme.Name)
+		data.HasMarkdown = data.ReadmeIsMD
 	}
 	if treePath != "" {
 		data.Breadcrumbs = breadcrumbs(repo.Name(), rev.Name, treePath)
@@ -452,8 +456,9 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 	}
 
 	displayName := displayRepoName(repo.Name())
+	isMarkdown := blob.Text && isMarkdownFile(blob.Name)
 	data := blobData{
-		pageData:             pageData{Title: blob.Name},
+		pageData:             pageData{Title: blob.Name, HasMarkdown: isMarkdown},
 		RepoName:             displayName,
 		HomeURL:              homeURL(repo.Name()),
 		CloneURLs:            s.cloneURLs(repo.Name()),
@@ -474,7 +479,7 @@ func (s *Server) blob(w http.ResponseWriter, r *http.Request, repoName, tail str
 		IsImage:              strings.HasPrefix(blob.ContentType, "image/"),
 		IsAudio:              strings.HasPrefix(blob.ContentType, "audio/"),
 		IsVideo:              strings.HasPrefix(blob.ContentType, "video/"),
-		IsMarkdown:           blob.Text && isMarkdownFile(blob.Name),
+		IsMarkdown:           isMarkdown,
 		MarkdownBaseURL:      objectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
 		MarkdownImageBaseURL: rawObjectURL(repo.Name(), "blob", rev.Name, dirPath) + "/",
 	}
@@ -695,6 +700,11 @@ func (s *Server) serveStyle(w http.ResponseWriter, r *http.Request) {
 func (s *Server) serveCopyScript(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	http.ServeFileFS(w, r, assets, "static/copy.js")
+}
+
+func (s *Server) serveMathScript(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	http.ServeFileFS(w, r, assets, "static/math.js")
 }
 
 func (s *Server) render(w http.ResponseWriter, name string, data any) {

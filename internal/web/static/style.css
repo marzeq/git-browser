@@ -275,6 +275,18 @@ pre {
   background: transparent;
 }
 
+.markdown-preview .math-inline,
+.markdown-preview .math-display {
+  overflow-wrap: normal;
+}
+
+.markdown-preview .math-display {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 @media (max-width: 720px) {
   .page {
     padding: 1rem;

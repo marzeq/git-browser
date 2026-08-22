@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{.Title}}</title>
   <link rel="stylesheet" href="/static/style.css">
+  {{if .HasMarkdown}}<link rel="stylesheet" href="/static/katex/katex.min.css">{{end}}
 </head>
 <body>
   <main class="page">
@@ -19,6 +20,11 @@
 
 {{define "copy-script"}}
 <script src="/static/copy.js"></script>
+{{end}}
+
+{{define "math-script"}}
+{{if .HasMarkdown}}<script src="/static/katex/katex.min.js"></script>
+<script src="/static/math.js"></script>{{end}}
 {{end}}
 
 {{define "breadcrumbs"}}

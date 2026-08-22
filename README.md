@@ -9,6 +9,7 @@ Minimal web UI for browsing local Git repositories.
 - viewing repository and file commit history
 - listing branches
 - showing the top-level `README` file inline
+- rendering inline `$...$` and display `$$...$$` math in Markdown with bundled KaTeX assets
 - copying configured SSH and/or HTTPS clone URLs from the page header
 
 Clone URLs are optional. Configure them with:

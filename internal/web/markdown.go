@@ -29,7 +29,7 @@ func renderMarkdown(source, linkBaseURL, imageBaseURL string) (template.HTML, er
 		return "", err
 	}
 	renderer := goldmark.New(
-		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithExtensions(extension.GFM, &markdownMathExtension{}),
 		goldmark.WithParserOptions(
 			parser.WithAutoHeadingID(),
 			parser.WithASTTransformers(
