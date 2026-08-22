@@ -1,0 +1,14 @@
+.git
+.agents
+.codex
+git-browser
+admin
+admin.pub
+id_dsa
+id_ecdsa
+id_ed25519
+id_rsa
+*.pub
+*.key
+*.pem
+.env

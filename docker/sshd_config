@@ -1,0 +1,39 @@
+Port 22
+ListenAddress 0.0.0.0
+
+HostKey /var/lib/gitolite/.ssh-host-keys/ssh_host_ed25519_key
+HostKey /var/lib/gitolite/.ssh-host-keys/ssh_host_rsa_key
+PidFile /run/sshd.pid
+
+AuthorizedKeysFile .ssh/authorized_keys
+PubkeyAuthentication yes
+AuthenticationMethods publickey
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+ChallengeResponseAuthentication no
+PermitEmptyPasswords no
+PermitRootLogin no
+UsePAM no
+
+AllowUsers git
+StrictModes yes
+PermitUserEnvironment no
+PermitUserRC no
+DisableForwarding yes
+AllowAgentForwarding no
+AllowTcpForwarding no
+AllowStreamLocalForwarding no
+GatewayPorts no
+X11Forwarding no
+PermitTunnel no
+
+LoginGraceTime 30
+MaxAuthTries 3
+MaxSessions 10
+MaxStartups 10:30:30
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+PrintMotd no
+LogLevel INFO
+Subsystem sftp internal-sftp

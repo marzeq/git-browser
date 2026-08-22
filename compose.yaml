@@ -1,0 +1,31 @@
+services:
+  git:
+    build:
+      context: .
+    image: git-browser-gitolite:local
+    restart: unless-stopped
+    pids_limit: 128
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 15s
+    environment:
+      GITOLITE_ADMIN_NAME: "${GITOLITE_ADMIN_NAME:-admin}"
+      GIT_BROWSER_CLONE_SSH_PREFIX: "${GIT_BROWSER_CLONE_SSH_PREFIX:-ssh://git@localhost:2222/}"
+    ports:
+      - "${GITOLITE_SSH_PORT:-2222}:22"
+      - "127.0.0.1:${GIT_BROWSER_HTTP_PORT:-8080}:8080"
+    secrets:
+      - gitolite_admin_key
+    tmpfs:
+      - /run:size=16m,mode=0755
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - gitolite-data:/var/lib/gitolite
+
+secrets:
+  gitolite_admin_key:
+    file: ./admin.pub
+
+volumes:
+  gitolite-data:
