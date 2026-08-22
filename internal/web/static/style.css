@@ -265,19 +265,43 @@ pre {
   }
 
   .title-row {
-    align-items: flex-start;
     flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .site-header h1 {
+    overflow-wrap: anywhere;
+  }
+
+  .revision-inline {
+    display: block;
+    margin-top: 0.25rem;
   }
 
   .clone-line {
-    margin-left: auto;
-    text-align: right;
-    white-space: normal;
+    width: 100%;
+    margin: 0;
+    text-align: left;
+    white-space: nowrap;
   }
 
   .clone-lines {
-    align-items: flex-end;
+    align-items: stretch;
+    gap: 0.5rem;
+    margin-left: 0;
     width: 100%;
+  }
+
+  .clone-line .copy-link {
+    display: block;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .nav-links,
+  .pager {
+    flex-wrap: wrap;
   }
 
   .listing,
