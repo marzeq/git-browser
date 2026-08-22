@@ -372,6 +372,68 @@ func TestLogOrdersMergeHistoryByCommitterTime(t *testing.T) {
 	}
 }
 
+func TestLogForFileIncludesOnlyChangesToThatFile(t *testing.T) {
+	root := t.TempDir()
+	if err := initRepo(root, "demo"); err != nil {
+		t.Fatal(err)
+	}
+
+	repo, err := git.PlainOpen(filepath.Join(root, "demo"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitFile := func(name, content, message string, when int64) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, "demo", name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Add(name); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := wt.Commit(message, &git.CommitOptions{Author: &object.Signature{
+			Name: "Test", Email: "test@example.com", When: time.Unix(when, 0),
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commitFile("other.txt", "other\n", "change another file", 60)
+	commitFile("README.md", "updated\n", "update readme", 120)
+	commitFile("other.txt", "other again\n", "change another file again", 180)
+
+	store, err := Discover(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	browserRepo, err := store.Open("demo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rev, err := browserRepo.DefaultRevision()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	first, err := browserRepo.Log(rev.Commit, "README.md", 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.Commits) != 1 || first.Commits[0].Message != "update readme" || !first.HasMore {
+		t.Fatalf("unexpected first page: %#v", first)
+	}
+
+	second, err := browserRepo.Log(rev.Commit, "README.md", 1, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.Commits) != 1 || second.Commits[0].Message != "initial commit" || second.HasMore {
+		t.Fatalf("unexpected second page: %#v", second)
+	}
+}
+
 func waitForCondition(t *testing.T, timeout time.Duration, check func() bool) {
 	t.Helper()
 

@@ -264,9 +264,6 @@ func (r *Repository) Log(commit *object.Commit, filePath string, page, perPage i
 		From:  commit.Hash,
 		Order: git.LogOrderCommitterTime,
 	}
-	if filePath != "" {
-		options.FileName = &filePath
-	}
 
 	iter, err := r.repo.Log(options)
 	if err != nil {
@@ -279,17 +276,57 @@ func (r *Repository) Log(commit *object.Commit, filePath string, page, perPage i
 	items := make([]*object.Commit, 0, perPage+1)
 	index := 0
 
+	var current *object.Commit
+	var currentEntry *object.TreeEntry
+	if filePath != "" {
+		current, err = iter.Next()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return &CommitPage{}, nil
+			}
+			return nil, err
+		}
+		currentEntry, err = commitTreeEntry(current, filePath)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	for {
 		next, err := iter.Next()
 		if err != nil {
-			if errors.Is(err, io.EOF) {
+			if !errors.Is(err, io.EOF) {
+				return nil, err
+			}
+			if filePath == "" {
 				break
 			}
-			return nil, err
+			next = nil
+		}
+
+		if filePath != "" {
+			nextEntry, err := commitTreeEntry(next, filePath)
+			if err != nil {
+				return nil, err
+			}
+			changed := treeEntriesDiffer(currentEntry, nextEntry)
+			candidate := current
+			current = next
+			currentEntry = nextEntry
+			if !changed {
+				if current == nil {
+					break
+				}
+				continue
+			}
+			next = candidate
 		}
 
 		if index < skip {
 			index++
+			if current == nil && filePath != "" {
+				break
+			}
 			continue
 		}
 		if len(items) >= limit-skip {
@@ -298,6 +335,9 @@ func (r *Repository) Log(commit *object.Commit, filePath string, page, perPage i
 
 		items = append(items, next)
 		index++
+		if current == nil && filePath != "" {
+			break
+		}
 	}
 
 	hasMore := len(items) > perPage
@@ -306,6 +346,34 @@ func (r *Repository) Log(commit *object.Commit, filePath string, page, perPage i
 	}
 
 	return &CommitPage{Commits: items, HasMore: hasMore}, nil
+}
+
+// treeEntriesDiffer is the exact-path equivalent of diffing two complete trees.
+// File history only needs one entry, so looking it up directly avoids walking and
+// comparing every file in both trees for every commit in the history.
+func treeEntriesDiffer(currentEntry, previousEntry *object.TreeEntry) bool {
+	if currentEntry == nil || previousEntry == nil {
+		return currentEntry != previousEntry
+	}
+	return currentEntry.Hash != previousEntry.Hash || currentEntry.Mode != previousEntry.Mode
+}
+
+func commitTreeEntry(commit *object.Commit, filePath string) (*object.TreeEntry, error) {
+	if commit == nil {
+		return nil, nil
+	}
+	tree, err := commit.Tree()
+	if err != nil {
+		return nil, err
+	}
+	entry, err := tree.FindEntry(filePath)
+	if err != nil {
+		if errors.Is(err, object.ErrEntryNotFound) || errors.Is(err, object.ErrDirectoryNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return entry, nil
 }
 
 func (r *Repository) Branches() ([]Branch, error) {
