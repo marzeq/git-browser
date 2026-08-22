@@ -298,4 +298,17 @@ pre {
     padding-left: 0;
     padding-right: 0;
   }
+
+  .file-list tr {
+    display: grid;
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+
+  .file-list .entry-kind {
+    padding-right: 0.6rem;
+  }
+
+  .file-list td[colspan] {
+    grid-column: 1 / -1;
+  }
 }
